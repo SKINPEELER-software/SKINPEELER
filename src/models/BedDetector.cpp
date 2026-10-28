@@ -113,10 +113,11 @@ std::vector<double> BedDetector::fitPolynomial(const std::vector<double>& x,
 //     kappa = |y''_orig| / (1 + y'_orig^2)^1.5
 //           = |(2/xrange)^2 * y''_norm| / (1 + (2/xrange * y'_norm)^2)^1.5
 //
-// Bug fixed (v2 -> v3): previous code evaluated curvature in normalised [-1,1]
-// space and compared directly against theta_curv = 0.003 [1/px] (original domain).
-// For a bed spanning ~250 px, normalised curvature ≈ 7 while the equivalent
-// original-domain curvature ≈ 0.0005 — a 14,000× discrepancy causing every bed
+// Curvature must be computed in the original pixel domain and compared
+// against theta_curv = 0.003 [1/px] (also in the original domain). Evaluating
+// curvature directly in the normalised [-1,1] space without the scale-factor
+// conversion above would produce values roughly 14,000x larger than the
+// original-domain curvature for a bed spanning ~250 px, causing every bed
 // candidate to be rejected as "too curved".
 // =============================================================================
 double BedDetector::maxCurvature(const std::vector<double>& coeffs,
@@ -281,18 +282,16 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
 // that is non-zero (foreground) within the vertical scan band derived from the
 // component centroid.
 //
-// Root-cause fix (v2 → v3):
-//   Previous code bounded the column scan to [cx_px ± scan_margin] where
-//   scan_margin = sqrt(VD_area / pi) * 1.5.  VD area is the sum of Voronoi disk
-//   generator cell areas — NOT the pixel count of the physical region.  For the CT
-//   scanner bed, VD area ≈ 1700 (radius ≈ 24 px) while the actual bed spans 70~80%
-//   of the 512-px image width (≈ 360~410 px).  The old scan covered only ~71 px,
-//   producing width_px ≈ 68~76 px — a 5× underestimate.
+// Column scan spans the full image width (0 … width-1), not a radius-derived
+// bound from VD area. VD area is the sum of Voronoi disk generator cell areas
+// — NOT the pixel count of the physical region. For the CT scanner bed, VD
+// area ≈ 1700 (radius ≈ 24 px) while the actual bed spans 70~80% of the
+// 512-px image width (≈ 360~410 px); a radius-derived column bound would
+// underestimate width_px by roughly 5x.
 //
-// Fix: column scan spans the FULL image width (0 … width-1).
-//   Row scan retains the centroid-based band: [cy_px - scan_margin, cy_px + scan_margin]
-//   where scan_margin = sqrt(VD_area / pi) * 1.5 (sufficient for vertical extent).
-//   The top-boundary width now reflects the true physical extent of the bed layer.
+// Row scan retains the centroid-based band: [cy_px - scan_margin, cy_px + scan_margin]
+// where scan_margin = sqrt(VD_area / pi) * 1.5 (sufficient for vertical extent).
+// The top-boundary width reflects the true physical extent of the bed layer.
 //
 // Scan range summary:
 //   col: 0 … width-1   (full image width — no longer area-constrained)
@@ -303,7 +302,7 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
 {
     candidate.top_boundary_rows.clear();
     candidate.top_boundary_cols.clear();
-    candidate.bottom_boundary_rows.clear();  // v4: reset bottom boundary
+    candidate.bottom_boundary_rows.clear();  // reset bottom boundary
 
     if (!image || width <= 0 || height <= 0) return;
 
@@ -342,7 +341,7 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
 
         if (top_row < 0) continue;  // no foreground in this column
 
-        // v4: Reverse scan from row_end downward to find bottommost foreground pixel
+        // Reverse scan from row_end downward to find bottommost foreground pixel
         for (int r = row_end; r >= top_row; --r) {
             if (image[r * width + c] > 0) {
                 bottom_row = r;
@@ -353,7 +352,7 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
 
         candidate.top_boundary_rows.push_back(top_row);
         candidate.top_boundary_cols.push_back(c);
-        candidate.bottom_boundary_rows.push_back(bottom_row);  // v4
+        candidate.bottom_boundary_rows.push_back(bottom_row);
     }
 
     // width_px: span of columns that have a valid top-boundary pixel
@@ -376,7 +375,7 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
 // (c) width_px >= theta_size * image_width
 // (d) max_curvature <= theta_curv
 // (e) general convexity: sag check + below-chord check
-// (f) avg thickness >= min_thickness_px  (v5: cloth exclusion)
+// (f) avg thickness >= min_thickness_px  (cloth exclusion: cloth is thin)
 // =============================================================================
 bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
                                   int image_width, int image_height,
@@ -477,12 +476,12 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
         return false;
     }
 
-    // (f) thickness check (v5): cloth false-positive exclusion.
+    // (f) thickness check: cloth false-positive exclusion.
     // Cloth lies directly beneath the body (thin, 5~15 px vertical extent).
     // Real CT bed is a thick flat plate (30+ px vertical extent, MM20 observed).
     // Metric: average of (bottom_row - top_row) across all boundary columns.
     // top_boundary_rows and bottom_boundary_rows are parallel vectors filled by
-    // extractTopBoundary (v4). If bottom_boundary_rows is empty or mismatched,
+    // extractTopBoundary(). If bottom_boundary_rows is empty or mismatched,
     // skip this condition conservatively (do not reject).
     {
         const int n_bnd = static_cast<int>(candidate_out.top_boundary_rows.size());
@@ -559,7 +558,7 @@ BedDetector::Result BedDetector::detect(
         // Build envelope with valid = false
         result.envelope.width = width;
         result.envelope.y_at_col.assign(width, -1);
-        result.envelope.bottom_y_at_col.assign(width, -1);  // v4
+        result.envelope.bottom_y_at_col.assign(width, -1);
         result.envelope.valid = false;
         return result;
     }
@@ -569,10 +568,10 @@ BedDetector::Result BedDetector::detect(
 
     // Build lower envelope from all bed candidates
     // top y: column-wise minimum top row across all bed candidates
-    // bottom y (v4): column-wise maximum bottom row across all bed candidates
+    // bottom y: column-wise maximum bottom row across all bed candidates
     result.envelope.width = width;
     result.envelope.y_at_col.assign(width, -1);
-    result.envelope.bottom_y_at_col.assign(width, -1);  // v4
+    result.envelope.bottom_y_at_col.assign(width, -1);
     result.envelope.valid = result.detected;
 
     for (const auto& cand : result.bed_candidates) {
@@ -590,7 +589,7 @@ BedDetector::Result BedDetector::detect(
                     top_r < result.envelope.y_at_col[c]) {
                     result.envelope.y_at_col[c] = top_r;
                 }
-                // bottom y (v4): take maximum (bottommost row)
+                // bottom y: take maximum (bottommost row)
                 if (result.envelope.bottom_y_at_col[c] < 0 ||
                     bot_r > result.envelope.bottom_y_at_col[c]) {
                     result.envelope.bottom_y_at_col[c] = bot_r;
@@ -599,11 +598,12 @@ BedDetector::Result BedDetector::detect(
         }
     }
 
-    // v6: top_y row clamp.
-    // envelope.y_at_col[col] 이 image_height * top_clamp_ratio 보다 위(작은 row)에 있으면
-    // clamp_row 값으로 강제한다. 천(cloth) + bed 합쳐진 component에서 top boundary가
-    // body 영역(이미지 상단)까지 올라오는 현상 방지.
-    // bottom_y_at_col은 clamp 안 함 (bed bottom은 항상 이미지 하단 → clamp_row 이상 보장됨).
+    // Top_y row clamp: any column whose envelope.y_at_col[col] is above
+    // (smaller row than) image_height * top_clamp_ratio gets forced down to
+    // that clamp row. Prevents a cloth+bed merged component's top boundary
+    // from reaching into the body region (upper part of the image).
+    // bottom_y_at_col is not clamped — the bed bottom is always near the
+    // image bottom, so it already lies below the clamp row.
     if (result.detected && params.top_clamp_ratio > 0.0) {
         const int top_clamp_row = static_cast<int>(
             static_cast<double>(height) * params.top_clamp_ratio);

@@ -160,7 +160,7 @@ struct SliceRecord {
     std::vector<int> bed_ids;
     int         new_body0_id   = -1;
     std::vector<int> envelope_y;
-    std::vector<int> bottom_y;  // v4: column-wise bottom y (-1 = no bed)
+    std::vector<int> bottom_y;  // column-wise bottom y (-1 = no bed)
 };
 
 // ---- Write a single slice record -------------------------------------------
@@ -173,7 +173,7 @@ static std::string serializeSlice(const SliceRecord& sr) {
     s += "      \"bed_component_ids\": " + intVecToJson(sr.bed_ids) + ",\n";
     s += "      \"new_body0_component_id\": " + std::to_string(sr.new_body0_id) + ",\n";
     s += "      \"envelope_y\": " + intVecToJson(sr.envelope_y) + ",\n";
-    s += "      \"bottom_y\": " + intVecToJson(sr.bottom_y) + "\n";  // v4
+    s += "      \"bottom_y\": " + intVecToJson(sr.bottom_y) + "\n";
     s += "    }";
     return s;
 }
@@ -190,7 +190,7 @@ static SliceRecord resultToRecord(const std::string& basename,
         sr.bed_ids.push_back(cand.component_id);
     sr.new_body0_id = result.new_body0_component_id;
     sr.envelope_y   = result.envelope.y_at_col;
-    sr.bottom_y     = result.envelope.bottom_y_at_col;  // v4
+    sr.bottom_y     = result.envelope.bottom_y_at_col;
     return sr;
 }
 
@@ -213,8 +213,8 @@ static BedDetector::Result recordToResult(const SliceRecord& sr) {
     result.envelope.width    = static_cast<int>(sr.envelope_y.size());
     result.envelope.valid    = sr.detected;
 
-    // v4: restore bottom_y. If cache was written by v3 (field absent), bottom_y
-    // will be empty → fill with -1 to match width, so callers can safely index.
+    // Restore bottom_y; if the field is absent from the cache file, fill
+    // with -1 to match width so callers can safely index.
     if (!sr.bottom_y.empty()) {
         result.envelope.bottom_y_at_col = sr.bottom_y;
     } else {
@@ -282,7 +282,7 @@ static bool readCacheFile(const std::string& path, double& file_beta,
             current.bed_ids = parseIntArray(t.substr(t.find("\"bed_component_ids\"")));
         if (t.find("\"envelope_y\"") != std::string::npos)
             current.envelope_y = parseIntArray(t.substr(t.find("\"envelope_y\"")));
-        if (t.find("\"bottom_y\"") != std::string::npos)  // v4
+        if (t.find("\"bottom_y\"") != std::string::npos)
             current.bottom_y = parseIntArray(t.substr(t.find("\"bottom_y\"")));
 
         if (brace_depth <= 0) {

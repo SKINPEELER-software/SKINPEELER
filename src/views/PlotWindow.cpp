@@ -30,7 +30,8 @@ PlotWindow::PlotWindow(PlotWidget* plotWidget,
     // Plot area (stretch)
     mainLayout->addWidget(m_plot, 1);
 
-    // GaussianPlotWidget 또는 ScatterPlotWidget일 때 axis range 컨트롤 패널 추가
+    // Add an axis-range control panel when the plot is a GaussianPlotWidget
+    // or ScatterPlotWidget
     bool isGaussian = qobject_cast<GaussianPlotWidget*>(m_plot) != nullptr;
     bool isScatter  = qobject_cast<ScatterPlotWidget*>(m_plot)  != nullptr;
     if (isGaussian || isScatter) {

@@ -241,7 +241,7 @@ void GaussianPlotWidget::paintEvent(QPaintEvent*)
         yMax = sorted[idx] * 1.1;
     }
 
-    // ── X range: 전체 distribution, threshold = 5% of globalPeak → center × 2배 확장
+    // ── X range: full distribution, threshold = 5% of globalPeak, then expand around center
     double threshold = 0.05 * globalPeakMax;
     double xMin_data = std::numeric_limits<double>::max();
     double xMax_data = std::numeric_limits<double>::lowest();
@@ -256,12 +256,13 @@ void GaussianPlotWidget::paintEvent(QPaintEvent*)
         xMax_data = std::max(xMax_data, mu + halfRange);
     }
     if (xMin_data > xMax_data) { xMin_data = 0.0; xMax_data = 1.0; }
-    // 현재 범위를 m_xRangeMult 배율로 확장 (center: 전체 중점 → skin peak 방향 30% bias)
+    // Expand the current range by m_xRangeMult (center: overall midpoint,
+    // biased 30% toward the skin peak)
     {
         double xCenter = (xMin_data + xMax_data) * 0.5;
         double xHalf   = (xMax_data - xMin_data) * 0.5;
 
-        // Skin 분포들의 평균 μ를 구해 center를 30% 가중 이동
+        // Compute the mean mu of the skin distributions and shift center 30% toward it
         double skinMuSum = 0.0;
         int    skinCount = 0;
         for (int i = 0; i <= m_peelIndex && i < N; ++i) {

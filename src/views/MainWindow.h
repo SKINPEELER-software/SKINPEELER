@@ -146,7 +146,7 @@ private:
     int  m_currentIndex      = 0;
     int  m_intervalSections  = 5;
     bool m_peeled            = false;
-    bool m_viewInitialized   = false;   // true after first fitInView (Bug 4)
+    bool m_viewInitialized   = false;   // true after first fitInView
 
     VisualizationMode m_vizMode   = VisualizationMode::WholeBody;
     QColor            m_skinColor = QColor(255, 255, 0);  // yellow

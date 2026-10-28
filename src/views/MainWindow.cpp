@@ -322,7 +322,7 @@ void MainWindow::navigateToImage(int index)
     CTImage* img = currentImage();
     if (!img) return;
 
-    // Bug 3: Sync beta — if spinbox value differs from stored beta, update and clear shells.
+    // Sync beta — if spinbox value differs from stored beta, update and clear shells.
     double spinBeta = currentBeta();
     if (std::abs(img->beta() - spinBeta) > 1e-9) {
         img->setBeta(spinBeta);  // clears existing shells for this image
@@ -637,7 +637,7 @@ void MainWindow::onSkinThicknessEdited(double value)
     int t = ShellIndex::toShellsIdx(static_cast<int>(value));
     t = std::max(0, std::min(t, static_cast<int>(img->shells().size()) - 1));
     img->setPeelIndex(t);
-    drawShellOverlays();   // 재계산 없이 overlay만 업데이트
+    drawShellOverlays();   // Update overlay only, without recalculating shells
 }
 
 // =============================================================================
@@ -690,7 +690,7 @@ void MainWindow::onPeelCurrentSlice()
     img->peelSkin(currentPeelRegion());
     drawCurrentCT();
 
-    // Bug 1: Peeled → uncheck Show Skin (overlay no longer meaningful on peeled image).
+    // Peeled → uncheck Show Skin (overlay no longer meaningful on peeled image).
     // setChecked(false) emits toggled(false) → onShowSkinToggled(false) → clearShellOverlays().
     m_ui->checkBox_ShowSkin->setChecked(false);
 
@@ -881,7 +881,7 @@ void MainWindow::resetUIState()
     m_vizMode          = VisualizationMode::WholeBody;
     m_peeled           = false;
     m_intervalSections = DEFAULT_INTERVAL_SECTIONS;
-    m_viewInitialized  = false;  // Bug 4: reset so next load triggers fitInView once
+    m_viewInitialized  = false;  // Reset so next load triggers fitInView once
 }
 
 void MainWindow::activateUIAfterLoad()
@@ -894,7 +894,7 @@ void MainWindow::activateUIAfterLoad()
     m_ui->lineEdit_TotalSection->setText(QString::number(m_images.size()));
     updateImageIndexUI();
 
-    m_ui->checkBox_ShowSkin->setChecked(true);  // Bug 1: Show Skin on by default after load
+    m_ui->checkBox_ShowSkin->setChecked(true);  // Show Skin on by default after load
 }
 
 void MainWindow::updateImageIndexUI()
@@ -946,7 +946,7 @@ void MainWindow::drawCurrentCT()
     CTImage* img = currentImage();
     if (!img) return;
     m_scene->displayCTImage(*img);
-    // Bug 4: fitInView only on the very first display after loading.
+    // fitInView only on the very first display after loading.
     // Subsequent slice navigation and peel preserve the current zoom/pan state.
     if (!m_viewInitialized) {
         m_ui->graphicsView->fitInView(m_scene->sceneRect(), Qt::KeepAspectRatio);

@@ -93,10 +93,10 @@ CTImage& CTImage::operator=(CTImage&&) noexcept = default;
 // =============================================================================
 // DICOM Image Extraction
 // Matches Python: slope*pixel_array + intercept → apply_voi_lut → subtract min
-// Bug 5 fix: explicitly read Window Center / Window Width from DICOM tags and
-// pass them to DicomImage::setWindow() so the correct preset is used.
-// Without this, DCMTK may default to the full HU range (-1024..3071), making
-// the image appear very low-contrast (washed out / grey).
+// Window Center / Window Width are read explicitly from the DICOM tags and
+// passed to DicomImage::setWindow() so the correct preset is used. Without
+// this, DCMTK may default to the full HU range (-1024..3071), making the
+// image appear very low-contrast (washed out / grey).
 // =============================================================================
 void CTImage::extractImageFromDicom()
 {

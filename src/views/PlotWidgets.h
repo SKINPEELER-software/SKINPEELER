@@ -124,8 +124,8 @@ private:
     int        m_peelIndex;    // algorithm cut (calcPeelIdx)
     int        m_currThick;    // user's current thickness
 
-    int    m_yPercentile = 98;   // 기본값 98%
-    double m_xRangeMult  = 1.55; // 기본값 1.55
+    int    m_yPercentile = 98;   // default 98%
+    double m_xRangeMult  = 1.55; // default 1.55
 };
 
 // =============================================================================
