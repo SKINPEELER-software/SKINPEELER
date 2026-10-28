@@ -32,35 +32,29 @@
 //   m_image after extractImageFromDicom() — windowed (WindowCenter/Width applied),
 //   minimum-subtracted uint16 values exactly as the pipeline uses them.
 //
-// Output directory default:
-//   experiments/F_robustness/exp_interslice_jaccard/skin_mask_dump/
+// Output directory default: ./skin_mask_dump/
 //   Override with --outdir <DIR> at end of CLI args.
 //
 // Usage (CLI mode — recommended):
 //   exp_skin_mask_dump <dicom_dir> <specimen_label> <beta> <slice1> [slice2 ...] [--outdir <DIR>]
 //
 //   dicom_dir: path to directory containing .dcm files. Quote if it contains spaces.
-//   specimen_label: short identifier for output filenames (e.g. GC20-1006).
+//   specimen_label: short identifier for output filenames (e.g. PHANTOM).
 //   beta: floating-point beta parameter (e.g. 0.69).
 //   sliceN: one or more integer slice numbers to process.
 //   --outdir <DIR>: (optional, must be last two args) override output directory.
 //
 //   Example:
-//     exp_skin_mask_dump "data/GC20-1006 (20210322-2)" GC20-1006 0.69 471 472 473
-//     exp_skin_mask_dump "data/CB20-0003" CB20-0003 0.66 658 659 --outdir /tmp/out
-//
-// Usage (no-args fallback mode):
-//   exp_skin_mask_dump
-//   Runs the built-in hard-coded target list (original behavior).
+//     exp_skin_mask_dump sample_data/phantom PHANTOM 0.69 1 4 8 --outdir /tmp/out
 //
 // Output format README:
 //   *_ct.raw  : dtype=uint16 (little-endian), shape=(512,512), row-major
 //   *_mask.raw: dtype=uint8,                  shape=(512,512), row-major
 //   *_comp.raw: dtype=uint8,                  shape=(512,512), row-major
 //   Read in Python:
-//     ct   = np.fromfile("CB20-0003_slice0658_ct.raw",   dtype='<u2').reshape(512,512)
-//     mask = np.fromfile("CB20-0003_slice0658_mask.raw",  dtype='u1').reshape(512,512)
-//     comp = np.fromfile("CB20-0003_slice0658_comp.raw",  dtype='u1').reshape(512,512)
+//     ct   = np.fromfile("PHANTOM_slice0001_ct.raw",   dtype='<u2').reshape(512,512)
+//     mask = np.fromfile("PHANTOM_slice0001_mask.raw",  dtype='u1').reshape(512,512)
+//     comp = np.fromfile("PHANTOM_slice0001_comp.raw",  dtype='u1').reshape(512,512)
 //
 // Component CSV (*_components.csv):
 //   Columns: component_id, centroid_x, centroid_y, area, circularity, score, is_selected
@@ -97,8 +91,7 @@ namespace fs = std::filesystem;
 // =============================================================================
 // Slice number extraction  (mirrors exp_component_jaccard.cpp)
 // =============================================================================
-static int extractSliceNum(const std::string& path)
-{
+static int extractSliceNum(const std::string& path) {
     std::string name = fs::path(path).filename().string();
     std::smatch m;
     static const std::regex rePrimary(R"(_CT_(\d+))");
@@ -113,14 +106,15 @@ static int extractSliceNum(const std::string& path)
 // =============================================================================
 // Discover all .dcm files in a directory, build a map: slice_num → path
 // =============================================================================
-static std::map<int, std::string> buildSliceMap(const std::string& dir)
-{
+static std::map<int, std::string> buildSliceMap(const std::string& dir) {
     std::map<int, std::string> result;
     for (const auto& entry : fs::directory_iterator(dir)) {
-        if (!entry.is_regular_file()) continue;
+        if (!entry.is_regular_file())
+            continue;
         std::string ext = entry.path().extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        if (ext != ".dcm") continue;
+        if (ext != ".dcm")
+            continue;
         std::string p = entry.path().string();
         int snum = extractSliceNum(p);
         result[snum] = p;
@@ -139,16 +133,14 @@ static std::map<int, std::string> buildSliceMap(const std::string& dir)
 //
 // Returns the number of skin pixels (for sanity check).
 // =============================================================================
-static long long buildSkinMask(const CTImage& img,
-                                std::vector<uint8_t>& maskOut)
-{
+static long long buildSkinMask(const CTImage& img, std::vector<uint8_t>& maskOut) {
     const int H = img.height();
     const int W = img.width();
     maskOut.assign(static_cast<size_t>(H * W), 0);
 
-    const int peelIdx     = img.peelIndex();
-    const auto& shells    = img.shells();
-    const int   nShells   = static_cast<int>(shells.size());
+    const int peelIdx = img.peelIndex();
+    const auto& shells = img.shells();
+    const int nShells = static_cast<int>(shells.size());
 
     long long skinPixels = 0;
 
@@ -156,8 +148,7 @@ static long long buildSkinMask(const CTImage& img,
     // shells[0] = S₀ = air → skip (start from si=1).
     for (int si = 1; si <= peelIdx && si < nShells; ++si) {
         for (const auto& vdata : shells[si]) {
-            auto [row, col] = CoordinateTransform::voronoiToImagePixel(
-                vdata.x, vdata.y, H, W);
+            auto [row, col] = CoordinateTransform::voronoiToImagePixel(vdata.x, vdata.y, H, W);
             if (!CoordinateTransform::isValidPixel(row, col, H, W))
                 continue;
             const int idx = row * W + col;
@@ -173,11 +164,11 @@ static long long buildSkinMask(const CTImage& img,
 // =============================================================================
 // Write raw binary file
 // =============================================================================
-template<typename T>
-static bool writeRaw(const std::string& path, const std::vector<T>& data)
-{
+template <typename T>
+static bool writeRaw(const std::string& path, const std::vector<T>& data) {
     std::ofstream f(path, std::ios::binary);
-    if (!f.is_open()) return false;
+    if (!f.is_open())
+        return false;
     f.write(reinterpret_cast<const char*>(data.data()),
             static_cast<std::streamsize>(data.size() * sizeof(T)));
     return f.good();
@@ -191,10 +182,10 @@ static bool writeRaw(const std::string& path, const std::vector<T>& data)
 // is_selected=1 for the row with the maximum score (the one the engine picked).
 // =============================================================================
 static bool writeComponentsCsv(const std::string& path,
-                                const std::vector<CTImage::ComponentScoreInfo>& comps)
-{
+                               const std::vector<CTImage::ComponentScoreInfo>& comps) {
     std::ofstream f(path);
-    if (!f.is_open()) return false;
+    if (!f.is_open())
+        return false;
 
     f << "component_id,centroid_x,centroid_y,area,circularity,score,is_selected,"
          "perimeter_total,outer_loop_length,n_inner_loops,n_outer_edges\n";
@@ -205,17 +196,9 @@ static bool writeComponentsCsv(const std::string& path,
     for (size_t i = 0; i < comps.size(); ++i) {
         const auto& c = comps[i];
         int is_selected = (i == 0) ? 1 : 0;
-        f << c.id       << ","
-          << c.centroid_x << ","
-          << c.centroid_y << ","
-          << c.area       << ","
-          << c.circularity << ","
-          << c.score       << ","
-          << is_selected   << ","
-          << c.perimeter_total   << ","
-          << c.outer_loop_length << ","
-          << c.n_inner_loops     << ","
-          << c.n_outer_edges     << "\n";
+        f << c.id << "," << c.centroid_x << "," << c.centroid_y << "," << c.area << ","
+          << c.circularity << "," << c.score << "," << is_selected << "," << c.perimeter_total
+          << "," << c.outer_loop_length << "," << c.n_inner_loops << "," << c.n_outer_edges << "\n";
     }
     return f.good();
 }
@@ -223,33 +206,31 @@ static bool writeComponentsCsv(const std::string& path,
 // =============================================================================
 // Print usage to stdout
 // =============================================================================
-static void printUsage(const char* argv0)
-{
-    std::cout <<
-        "Usage:\n"
-        "  " << argv0 << " <dicom_dir> <specimen_label> <beta> <slice1> [slice2 ...] [--outdir <DIR>]\n"
-        "\n"
-        "Arguments:\n"
-        "  dicom_dir       Path to DICOM directory (quote if it contains spaces).\n"
-        "  specimen_label  Short label used in output filenames (e.g. GC20-1006).\n"
-        "  beta            Beta parameter, float (e.g. 0.69).\n"
-        "  sliceN          One or more integer slice numbers to process.\n"
-        "  --outdir <DIR>  (optional) Override output directory (default: skin_mask_dump/).\n"
-        "\n"
-        "Example:\n"
-        "  " << argv0 << " \"data/GC20-1006 (20210322-2)\" GC20-1006 0.69 471 472 473\n"
-        "  " << argv0 << " \"data/CB20-0003\" CB20-0003 0.66 658 659 --outdir /tmp/out\n"
-        "\n"
-        "No-args mode:\n"
-        "  " << argv0 << "\n"
-        "  Runs the built-in hard-coded target list.\n"
-        "\n"
-        "Output files per slice:\n"
-        "  <specimen>_slice<NNNN>_ct.raw         — windowed CT uint16 512x512\n"
-        "  <specimen>_slice<NNNN>_mask.raw        — skin mask uint8 512x512\n"
-        "  <specimen>_slice<NNNN>_comp.raw        — biggest component mask uint8 512x512\n"
-        "  <specimen>_slice<NNNN>_components.csv  — per-component score diagnostics\n"
-        "  summary.csv                            — per-slice aggregate stats\n";
+static void printUsage(const char* argv0) {
+    std::cout
+        << "Usage:\n"
+           "  "
+        << argv0
+        << " <dicom_dir> <specimen_label> <beta> <slice1> [slice2 ...] [--outdir <DIR>]\n"
+           "\n"
+           "Arguments:\n"
+           "  dicom_dir       Path to DICOM directory (quote if it contains spaces).\n"
+           "  specimen_label  Short label used in output filenames (e.g. PHANTOM).\n"
+           "  beta            Beta parameter, float (e.g. 0.69).\n"
+           "  sliceN          One or more integer slice numbers to process.\n"
+           "  --outdir <DIR>  (optional) Override output directory (default: skin_mask_dump/).\n"
+           "\n"
+           "Example:\n"
+           "  "
+        << argv0
+        << " sample_data/phantom PHANTOM 0.69 1 4 8 --outdir /tmp/out\n"
+           "\n"
+           "Output files per slice:\n"
+           "  <specimen>_slice<NNNN>_ct.raw         — windowed CT uint16 512x512\n"
+           "  <specimen>_slice<NNNN>_mask.raw        — skin mask uint8 512x512\n"
+           "  <specimen>_slice<NNNN>_comp.raw        — biggest component mask uint8 512x512\n"
+           "  <specimen>_slice<NNNN>_components.csv  — per-component score diagnostics\n"
+           "  summary.csv                            — per-slice aggregate stats\n";
 }
 
 // =============================================================================
@@ -258,7 +239,7 @@ static void printUsage(const char* argv0)
 struct SpecimenSpec {
     std::string dicomDir;
     std::string label;
-    double      beta;
+    double beta;
     std::vector<int> slices;
 };
 
@@ -266,9 +247,8 @@ struct SpecimenSpec {
 // Process all slices for the given target list into outDir.
 // Returns {nOk, nFail}.
 // =============================================================================
-static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& targets,
-                                          const std::string& outDir)
-{
+static std::pair<int, int> processTargets(const std::vector<SpecimenSpec>& targets,
+                                          const std::string& outDir) {
     fs::create_directories(outDir);
     std::cout << "  output_dir : " << outDir << "\n\n";
 
@@ -277,73 +257,69 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
     // -------------------------------------------------------------------------
     {
         std::ofstream readme(outDir + "/README.txt");
-        readme <<
-            "exp_skin_mask_dump output\n"
-            "=========================\n"
-            "\n"
-            "File naming: <specimen>_slice<NNNN>_{ct,mask,comp}.raw\n"
-            "             <specimen>_slice<NNNN>_components.csv\n"
-            "\n"
-            "CT file (*_ct.raw):\n"
-            "  dtype  = uint16, little-endian (<u2)\n"
-            "  shape  = (512, 512), row-major (C order)\n"
-            "  values = windowed CT intensity (WindowCenter/Width applied,\n"
-            "           then minimum subtracted), as used by SKINPEELER engine\n"
-            "\n"
-            "Skin mask file (*_mask.raw):\n"
-            "  dtype  = uint8 (u1)\n"
-            "  shape  = (512, 512), row-major (C order)\n"
-            "  values = 1 (skin pixel), 0 (air / body / background)\n"
-            "\n"
-            "Component mask file (*_comp.raw):\n"
-            "  dtype  = uint8 (u1)\n"
-            "  shape  = (512, 512), row-major (C order)\n"
-            "  values = 1 (biggest beta-complex component pixel), 0 (background)\n"
-            "  note   = cut-independent, pre-peel; this is the Jaccard measurement target.\n"
-            "           Extracted via CTImage::extractBiggestComponentMaskFromVoronoi()\n"
-            "           (same Voronoi state as calculateShells(), before releaseVoronoi()).\n"
-            "           Containment property: skin (mask) is a subset of component (comp).\n"
-            "\n"
-            "Component CSV (*_components.csv):\n"
-            "  Columns: component_id, centroid_x, centroid_y, area, circularity, score, is_selected\n"
-            "  score = area * circularity^2 (same metric as biggest-component selection).\n"
-            "  is_selected = 1 for the component actually selected (highest score = index 0).\n"
-            "  Sorted by score descending.\n"
-            "\n"
-            "Skin definition:\n"
-            "  m_shells[0]              = S0 = air (outermost) -> NOT skin\n"
-            "  m_shells[1..peelIndex]   = skin shells           -> mask=1\n"
-            "  m_shells[peelIndex+1..]  = body shells           -> mask=0\n"
-            "  peelIndex = m_algoPeelIndex (algorithm-computed cut)\n"
-            "\n"
-            "Python read example:\n"
-            "  import numpy as np\n"
-            "  ct   = np.fromfile('CB20-0003_slice0658_ct.raw',   dtype='<u2').reshape(512,512)\n"
-            "  mask = np.fromfile('CB20-0003_slice0658_mask.raw',  dtype='u1').reshape(512,512)\n"
-            "  comp = np.fromfile('CB20-0003_slice0658_comp.raw',  dtype='u1').reshape(512,512)\n"
-            "  # sanity: skin subset of component\n"
-            "  assert np.sum((mask==1) & (comp==0)) == 0\n"
-            "\n"
-            "Per-specimen adaptive beta:\n"
-            "  CB20-0003: beta=0.66\n"
-            "  MM20-0006: beta=0.68\n"
-            "  VR00483:   beta=0.66\n"
-            "\n"
-            "Generated by: exp_skin_mask_dump (SKINPEELER engine)\n";
+        readme
+            << "exp_skin_mask_dump output\n"
+               "=========================\n"
+               "\n"
+               "File naming: <specimen>_slice<NNNN>_{ct,mask,comp}.raw\n"
+               "             <specimen>_slice<NNNN>_components.csv\n"
+               "\n"
+               "CT file (*_ct.raw):\n"
+               "  dtype  = uint16, little-endian (<u2)\n"
+               "  shape  = (512, 512), row-major (C order)\n"
+               "  values = windowed CT intensity (WindowCenter/Width applied,\n"
+               "           then minimum subtracted), as used by SKINPEELER engine\n"
+               "\n"
+               "Skin mask file (*_mask.raw):\n"
+               "  dtype  = uint8 (u1)\n"
+               "  shape  = (512, 512), row-major (C order)\n"
+               "  values = 1 (skin pixel), 0 (air / body / background)\n"
+               "\n"
+               "Component mask file (*_comp.raw):\n"
+               "  dtype  = uint8 (u1)\n"
+               "  shape  = (512, 512), row-major (C order)\n"
+               "  values = 1 (biggest beta-complex component pixel), 0 (background)\n"
+               "  note   = cut-independent, pre-peel; this is the Jaccard measurement target.\n"
+               "           Extracted via CTImage::extractBiggestComponentMaskFromVoronoi()\n"
+               "           (same Voronoi state as calculateShells(), before releaseVoronoi()).\n"
+               "           Containment property: skin (mask) is a subset of component (comp).\n"
+               "\n"
+               "Component CSV (*_components.csv):\n"
+               "  Columns: component_id, centroid_x, centroid_y, area, circularity, score, "
+               "is_selected\n"
+               "  score = area * circularity^2 (same metric as biggest-component selection).\n"
+               "  is_selected = 1 for the component actually selected (highest score = index 0).\n"
+               "  Sorted by score descending.\n"
+               "\n"
+               "Skin definition:\n"
+               "  m_shells[0]              = S0 = air (outermost) -> NOT skin\n"
+               "  m_shells[1..peelIndex]   = skin shells           -> mask=1\n"
+               "  m_shells[peelIndex+1..]  = body shells           -> mask=0\n"
+               "  peelIndex = m_algoPeelIndex (algorithm-computed cut)\n"
+               "\n"
+               "Python read example:\n"
+               "  import numpy as np\n"
+               "  ct   = np.fromfile('PHANTOM_slice0001_ct.raw',   dtype='<u2').reshape(512,512)\n"
+               "  mask = np.fromfile('PHANTOM_slice0001_mask.raw',  dtype='u1').reshape(512,512)\n"
+               "  comp = np.fromfile('PHANTOM_slice0001_comp.raw',  dtype='u1').reshape(512,512)\n"
+               "  # sanity: skin subset of component\n"
+               "  assert np.sum((mask==1) & (comp==0)) == 0\n"
+               "\n"
+               "Generated by: exp_skin_mask_dump (SKINPEELER engine)\n";
     }
 
     // -------------------------------------------------------------------------
     // Summary CSV
     // -------------------------------------------------------------------------
     std::ofstream summary(outDir + "/summary.csv");
-    summary << "specimen,slice_num,beta,skin_pixels,comp_pixels,skin_not_in_comp,peel_index,shell_count,n_components,status\n";
+    summary << "specimen,slice_num,beta,skin_pixels,comp_pixels,skin_not_in_comp,peel_index,shell_"
+               "count,n_components,status\n";
     summary << std::fixed << std::setprecision(4);
 
     int nOk = 0, nFail = 0;
 
     for (const auto& spec : targets) {
-        std::cout << "--- Specimen: " << spec.label
-                  << "  beta=" << spec.beta
+        std::cout << "--- Specimen: " << spec.label << "  beta=" << spec.beta
                   << "  dir=" << spec.dicomDir << "\n";
 
         // Build slice map once per specimen
@@ -353,8 +329,8 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
         for (int snum : spec.slices) {
             auto it = sliceMap.find(snum);
             if (it == sliceMap.end()) {
-                std::cerr << "  WARNING: slice " << snum
-                          << " not found in " << spec.dicomDir << "\n";
+                std::cerr << "  WARNING: slice " << snum << " not found in " << spec.dicomDir
+                          << "\n";
                 summary << spec.label << "," << snum << "," << spec.beta
                         << ",-1,-1,-1,-1,-1,-1,NOT_FOUND\n";
                 ++nFail;
@@ -371,8 +347,8 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
 
                 const int H = img.height();
                 const int W = img.width();
-                const int peelIdx   = img.peelIndex();
-                const int shellCnt  = static_cast<int>(img.shells().size());
+                const int peelIdx = img.peelIndex();
+                const int shellCnt = static_cast<int>(img.shells().size());
 
                 // ---- Component score diagnostics (before releaseVoronoi) ----
                 // Must be called while Voronoi is still alive (after calculateShells,
@@ -381,8 +357,7 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
                 const int nComps = static_cast<int>(compScores.size());
 
                 // ---- Biggest β-complex component mask (before releaseVoronoi) ----
-                std::vector<char> compCharMask =
-                    img.extractBiggestComponentMaskFromVoronoi();
+                std::vector<char> compCharMask = img.extractBiggestComponentMaskFromVoronoi();
 
                 // ---- Biggest-AREA component mask (diagnostic; may differ from
                 //      the biggest-SCORE component above). Must run before
@@ -403,13 +378,13 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
 
                 // Build output file paths
                 std::ostringstream oss;
-                oss << outDir << "/" << spec.label << "_slice"
-                    << std::setw(4) << std::setfill('0') << snum;
-                const std::string basePath  = oss.str();
-                const std::string ctPath    = basePath + "_ct.raw";
-                const std::string maskPath  = basePath + "_mask.raw";
-                const std::string compPath  = basePath + "_comp.raw";
-                const std::string csvPath   = basePath + "_components.csv";
+                oss << outDir << "/" << spec.label << "_slice" << std::setw(4) << std::setfill('0')
+                    << snum;
+                const std::string basePath = oss.str();
+                const std::string ctPath = basePath + "_ct.raw";
+                const std::string maskPath = basePath + "_mask.raw";
+                const std::string compPath = basePath + "_comp.raw";
+                const std::string csvPath = basePath + "_components.csv";
 
                 // ---- CT raw ----
                 const std::vector<uint16_t>& ctData = img.image();
@@ -430,7 +405,8 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
                 for (int i = 0; i < H * W; ++i) {
                     compMask[static_cast<size_t>(i)] =
                         (compCharMask[static_cast<size_t>(i)] != 0) ? 1u : 0u;
-                    if (compMask[static_cast<size_t>(i)]) ++compPx;
+                    if (compMask[static_cast<size_t>(i)])
+                        ++compPx;
                 }
                 if (!writeRaw(compPath, compMask))
                     throw std::runtime_error("cannot write comp raw: " + compPath);
@@ -452,29 +428,21 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
                 // ---- Sanity: skin ⊆ component ----
                 long long skinNotInComp = 0;
                 for (int i = 0; i < H * W; ++i) {
-                    if (mask[static_cast<size_t>(i)] == 1 &&
-                        compMask[static_cast<size_t>(i)] == 0)
+                    if (mask[static_cast<size_t>(i)] == 1 && compMask[static_cast<size_t>(i)] == 0)
                         ++skinNotInComp;
                 }
 
-                std::cout << "skin_px=" << std::setw(6) << skinPx
-                          << "  comp_px=" << std::setw(7) << compPx
-                          << "  skin_not_in_comp=" << skinNotInComp
-                          << "  peelIdx=" << peelIdx
-                          << "  shells=" << shellCnt
+                std::cout << "skin_px=" << std::setw(6) << skinPx << "  comp_px=" << std::setw(7)
+                          << compPx << "  skin_not_in_comp=" << skinNotInComp
+                          << "  peelIdx=" << peelIdx << "  shells=" << shellCnt
                           << "  n_comps=" << nComps;
                 if (skinNotInComp > 0)
                     std::cout << "  *** SUBSET VIOLATION ***";
                 std::cout << "\n";
 
-                summary << spec.label << "," << snum << "," << spec.beta
-                        << "," << skinPx
-                        << "," << compPx
-                        << "," << skinNotInComp
-                        << "," << peelIdx
-                        << "," << shellCnt
-                        << "," << nComps
-                        << ",OK\n";
+                summary << spec.label << "," << snum << "," << spec.beta << "," << skinPx << ","
+                        << compPx << "," << skinNotInComp << "," << peelIdx << "," << shellCnt
+                        << "," << nComps << ",OK\n";
                 ++nOk;
 
             } catch (const std::exception& e) {
@@ -494,48 +462,32 @@ static std::pair<int,int> processTargets(const std::vector<SpecimenSpec>& target
 // =============================================================================
 // main
 // =============================================================================
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     std::cout << "=== exp_skin_mask_dump ===\n";
 
-    // -------------------------------------------------------------------------
-    // Determine mode: CLI (argc>1) or hard-coded fallback (argc==1)
-    // -------------------------------------------------------------------------
-
-    const std::string dataRoot =
-        "/home/hwkim/workspace/SKINPEELER-project/skinpeeler-project"
-        "/sources/SKINPEELER-cppGUI/data";
-
-    const std::string defaultOutDir =
-        "/home/hwkim/workspace/SKINPEELER-project/skinpeeler-project"
-        "/experiments/F_robustness/exp_interslice_jaccard/skin_mask_dump";
-
     std::vector<SpecimenSpec> targets;
-    std::string outDir = defaultOutDir;
+    std::string outDir = "./skin_mask_dump";
 
-    if (argc > 1) {
-        // ---------------------------------------------------------------------
-        // CLI mode:
-        //   argv[1] = dicom_dir
-        //   argv[2] = specimen_label
-        //   argv[3] = beta
-        //   argv[4..] = slice numbers (integers), optionally followed by
-        //               --outdir <DIR> as the last two arguments
-        // ---------------------------------------------------------------------
+    // CLI arguments are required:
+    //   argv[1] = dicom_dir
+    //   argv[2] = specimen_label
+    //   argv[3] = beta
+    //   argv[4..] = slice numbers (integers), optionally followed by
+    //               --outdir <DIR> as the last two arguments
+    {
         if (argc < 5) {
             std::cerr << "ERROR: insufficient arguments.\n\n";
             printUsage(argv[0]);
             return 1;
         }
 
-        std::string dicomDir     = argv[1];
+        std::string dicomDir = argv[1];
         std::string specimenLabel = argv[2];
         double beta = 0.0;
         try {
             beta = std::stod(argv[3]);
         } catch (...) {
-            std::cerr << "ERROR: beta must be a floating-point number, got: "
-                      << argv[3] << "\n";
+            std::cerr << "ERROR: beta must be a floating-point number, got: " << argv[3] << "\n";
             return 1;
         }
 
@@ -551,8 +503,7 @@ int main(int argc, char* argv[])
             try {
                 slices.push_back(std::stoi(argv[i]));
             } catch (...) {
-                std::cerr << "ERROR: slice number must be integer, got: "
-                          << argv[i] << "\n";
+                std::cerr << "ERROR: slice number must be integer, got: " << argv[i] << "\n";
                 return 1;
             }
         }
@@ -570,55 +521,15 @@ int main(int argc, char* argv[])
         std::cout << "  specimen   : " << specimenLabel << "\n";
         std::cout << "  beta       : " << beta << "\n";
         std::cout << "  slices     :";
-        for (int s : slices) std::cout << " " << s;
+        for (int s : slices)
+            std::cout << " " << s;
         std::cout << "\n";
-
-    } else {
-        // ---------------------------------------------------------------------
-        // Hard-coded fallback mode (original behavior preserved)
-        // ---------------------------------------------------------------------
-        std::cout << "  mode       : hard-coded fallback (use CLI args to override)\n";
-
-        targets = {
-            {
-                dataRoot + "/CB20-0003 (20210322-9)",
-                "CB20-0003",
-                0.66,
-                {658, 659, 660, 661, 662, 665, 666, 667, 669, 670, 671}
-            },
-            {
-                dataRoot + "/MM20-0006 (20210322-5)",
-                "MM20-0006",
-                0.68,
-                {455, 456, 457}
-            },
-            {
-                dataRoot + "/KNU240704-4",
-                "VR00483",
-                0.66,
-                {58, 59, 60, 1073, 1074, 1075, 1076}
-            },
-            {
-                "/home/hwkim/workspace/SKINPEELER-project/skinpeeler-project"
-                "/experiments/bed_detector_mm20_test/MM20-0006_v9_curve",
-                "MM20-0006-bedrm",
-                0.68,
-                {324, 325, 326, 456, 460, 461, 462, 465, 466, 467}
-            },
-            {
-                "/home/hwkim/workspace/SKINPEELER-project/skinpeeler-project"
-                "/experiments/bed_detector_vr00483/VR00483_v9_curve",
-                "VR00483-bedrm",
-                0.66,
-                {58, 59, 1076}
-            }
-        };
     }
 
     auto [nOk, nFail] = processTargets(targets, outDir);
 
     std::cout << "=== Summary ===\n";
-    std::cout << "  OK   : " << nOk   << "\n";
+    std::cout << "  OK   : " << nOk << "\n";
     std::cout << "  FAIL : " << nFail << "\n";
     std::cout << "  summary CSV: " << outDir << "/summary.csv\n";
     std::cout << "  README     : " << outDir << "/README.txt\n";
