@@ -40,22 +40,19 @@
 
 struct CTImage::VoronoiImpl {
     V::ImageProcessingBC bc;
-    std::vector<V::QuasiVertex> outerShellQVerts; // populated by extractOuterShell()
+    std::vector<V::QuasiVertex> outerShellQVerts;  // populated by extractOuterShell()
 };
 
 // =============================================================================
 // Factory
 // =============================================================================
-CTImage CTImage::fromDicomFile(const std::string& filepath, double beta, int defaultThickness)
-{
+CTImage CTImage::fromDicomFile(const std::string& filepath, double beta, int defaultThickness) {
     // Register JPEG decoders once (idempotent — DCMTK ignores repeated calls
     // when codecs are already registered). This enables Transfer Syntax
     // 1.2.840.10008.1.2.4.70 (JPEG Lossless) and all other JPEG processes.
     // Thread-safe: DCMTK uses an internal mutex for codec registration.
     static std::once_flag s_jpegCodecFlag;
-    std::call_once(s_jpegCodecFlag, []() {
-        DJDecoderRegistration::registerCodecs();
-    });
+    std::call_once(s_jpegCodecFlag, []() { DJDecoderRegistration::registerCodecs(); });
 
     auto ff = std::make_unique<DcmFileFormat>();
     OFCondition status = ff->loadFile(filepath.c_str());
@@ -77,15 +74,12 @@ CTImage CTImage::fromDicomFile(const std::string& filepath, double beta, int def
 // =============================================================================
 // Constructor / Destructor
 // =============================================================================
-CTImage::CTImage(std::unique_ptr<DcmFileFormat> fileFormat,
-                 const std::string& filepath,
-                 double beta,
-                 int    defaultThickness)
-    : m_fileFormat(std::move(fileFormat))
-    , m_filepath(filepath)
-    , m_beta(beta)
-    , m_defaultThickness(defaultThickness)
-{
+CTImage::CTImage(std::unique_ptr<DcmFileFormat> fileFormat, const std::string& filepath,
+                 double beta, int defaultThickness)
+    : m_fileFormat(std::move(fileFormat)),
+      m_filepath(filepath),
+      m_beta(beta),
+      m_defaultThickness(defaultThickness) {
     extractImageFromDicom();
 }
 
@@ -101,16 +95,15 @@ CTImage& CTImage::operator=(CTImage&&) noexcept = default;
 // this, DCMTK may default to the full HU range (-1024..3071), making the
 // image appear very low-contrast (washed out / grey).
 // =============================================================================
-void CTImage::extractImageFromDicom()
-{
+void CTImage::extractImageFromDicom() {
     DcmDataset* ds = m_fileFormat->getDataset();
 
     // 1. Dimensions
     Uint16 rows = 0, cols = 0;
-    ds->findAndGetUint16(DCM_Rows,    rows);
+    ds->findAndGetUint16(DCM_Rows, rows);
     ds->findAndGetUint16(DCM_Columns, cols);
     m_height = static_cast<int>(rows);
-    m_width  = static_cast<int>(cols);
+    m_width = static_cast<int>(cols);
     const int nPixels = m_height * m_width;
 
     // 3. Use DicomImage for automatic decompression + Rescale slope/intercept.
@@ -128,13 +121,10 @@ void CTImage::extractImageFromDicom()
         DcmElement* wcElem = nullptr;
         DcmElement* wwElem = nullptr;
         if (ds->findAndGetElement(DCM_WindowCenter, wcElem).good() && wcElem &&
-            ds->findAndGetElement(DCM_WindowWidth,  wwElem).good() && wwElem)
-        {
+            ds->findAndGetElement(DCM_WindowWidth, wwElem).good() && wwElem) {
             Float64 wc = 0.0, ww = 0.0;
             // Use the FIRST value (index 0) — matches pydicom default behaviour
-            if (wcElem->getFloat64(wc, 0).good() &&
-                wwElem->getFloat64(ww, 0).good() && ww > 0.0)
-            {
+            if (wcElem->getFloat64(wc, 0).good() && wwElem->getFloat64(ww, 0).good() && ww > 0.0) {
                 dicomImg.setWindow(wc, ww);
             }
         }
@@ -142,8 +132,7 @@ void CTImage::extractImageFromDicom()
     }
 
     // 5. Get 16-bit output with the window applied
-    const uint16_t* outPtr =
-        static_cast<const uint16_t*>(dicomImg.getOutputData(16));
+    const uint16_t* outPtr = static_cast<const uint16_t*>(dicomImg.getOutputData(16));
     if (!outPtr)
         throw DicomLoadError("Failed to get DicomImage output data");
 
@@ -169,8 +158,7 @@ void CTImage::extractImageFromDicom()
             // the internally decoded (rescale-applied) 16-bit array.
             const DiPixel* diPixel = dicomImg.getInterData();
             if (diPixel && diPixel->getData()) {
-                const Uint16* rawData =
-                    static_cast<const Uint16*>(diPixel->getData());
+                const Uint16* rawData = static_cast<const Uint16*>(diPixel->getData());
                 m_originalImage.assign(rawData, rawData + nPixels);
             } else {
                 // Final fallback: use the windowed output (adequate for display;
@@ -196,8 +184,7 @@ void CTImage::extractImageFromDicom()
             ds->findAndGetUint16(DCM_PixelRepresentation, pixelRep);
             if (pixelRep == 1) {
                 // Signed int16 dataset: find min in signed domain
-                const int16_t* sPtr =
-                    reinterpret_cast<const int16_t*>(m_originalImage.data());
+                const int16_t* sPtr = reinterpret_cast<const int16_t*>(m_originalImage.data());
                 const int16_t* sEnd = sPtr + m_originalImage.size();
                 int16_t sMin = *std::min_element(sPtr, sEnd);
                 // Store as the uint16 bit pattern (memcpy is well-defined)
@@ -207,8 +194,7 @@ void CTImage::extractImageFromDicom()
                 m_minIntensity = uMin;
             } else {
                 // Unsigned: straightforward
-                m_minIntensity = *std::min_element(
-                    m_originalImage.begin(), m_originalImage.end());
+                m_minIntensity = *std::min_element(m_originalImage.begin(), m_originalImage.end());
             }
         } else {
             m_minIntensity = 0;
@@ -217,10 +203,10 @@ void CTImage::extractImageFromDicom()
 
     // 6. Subtract minimum — matches Python: image -= np.min(image)
     uint16_t minVal = *std::min_element(m_image.begin(), m_image.end());
-    for (auto& p : m_image) p -= minVal;
+    for (auto& p : m_image)
+        p -= minVal;
 
-    m_imageMax = static_cast<double>(
-        *std::max_element(m_image.begin(), m_image.end()));
+    m_imageMax = static_cast<double>(*std::max_element(m_image.begin(), m_image.end()));
 
     // 7. Read Slice Location for sorting (fallback: InstanceNumber, then 0)
     {
@@ -239,15 +225,14 @@ void CTImage::extractImageFromDicom()
 // normalizeToMax  — cross-slice intensity normalization
 // Python: self._image = (65535 * self._image / global_max).astype(np.uint16)
 // =============================================================================
-void CTImage::normalizeToMax(double globalMax)
-{
-    if (globalMax <= 0.0) globalMax = 1.0;
+void CTImage::normalizeToMax(double globalMax) {
+    if (globalMax <= 0.0)
+        globalMax = 1.0;
     for (auto& p : m_image)
         p = static_cast<uint16_t>(IMAGE_MAX_VALUE * static_cast<double>(p) / globalMax);
 }
 
-void CTImage::setBeta(double b)
-{
+void CTImage::setBeta(double b) {
     m_beta = std::max(0.0, std::min(1.0, b));
     m_shells.clear();
     m_voronoi.reset();
@@ -256,9 +241,9 @@ void CTImage::setBeta(double b)
     // above, so they go stale the moment beta changes and must be recomputed
     // by the next calculateShells() call. Leaving them behind previously let
     // callers read peel/cut/bed state computed under the OLD beta.
-    m_peelIndex     = 0;
+    m_peelIndex = 0;
     m_algoPeelIndex = 0;
-    m_peeled        = false;
+    m_peeled = false;
     m_shellMahalD.clear();
     m_shellInside.clear();
     m_bedResult = BedDetector::Result{};
@@ -271,14 +256,12 @@ void CTImage::setBeta(double b)
 // image to column-major, read BitsStored, constructForImageProcessing16bit,
 // set_beta_value, classifyByComponents. Allocates m_voronoi.
 // =============================================================================
-void CTImage::buildAndClassifyVoronoi()
-{
+void CTImage::buildAndClassifyVoronoi() {
     m_voronoi = std::make_unique<VoronoiImpl>();
     V::ImageProcessingBC& bc = m_voronoi->bc;
 
     // Transpose image to column-major for the C++ library
-    std::vector<std::vector<int>> colorDataSet(
-        m_width, std::vector<int>(m_height));
+    std::vector<std::vector<int>> colorDataSet(m_width, std::vector<int>(m_height));
     for (int r = 0; r < m_height; ++r)
         for (int c = 0; c < m_width; ++c)
             colorDataSet[c][r] = static_cast<int>(m_image[r * m_width + c]);
@@ -299,8 +282,7 @@ void CTImage::buildAndClassifyVoronoi()
 // calculateShells  — main entry point for Voronoi + shell extraction
 // Always extracts all reachable shells (maximize mode). See CTImage.h for rationale.
 // =============================================================================
-void CTImage::calculateShells()
-{
+void CTImage::calculateShells() {
     m_timedOut = false;
     try {
         // Build Voronoi / beta-complex (shared with computeBiggestComponentMask())
@@ -318,13 +300,13 @@ void CTImage::calculateShells()
         if (m_bedRemovalEnabled) {
             // --- Cache lookup ---
             std::string cacheDir = m_specimenDir.empty()
-                ? std::filesystem::path(m_filepath).parent_path().string()
-                : m_specimenDir;
+                                       ? std::filesystem::path(m_filepath).parent_path().string()
+                                       : m_specimenDir;
 
             bool cacheHit = false;
             if (BedCache::exists(cacheDir, m_beta, BedCache::ALGORITHM_VERSION)) {
-                cacheHit = BedCache::load(cacheDir, m_beta, BedCache::ALGORITHM_VERSION,
-                                          m_filepath, m_bedResult);
+                cacheHit = BedCache::load(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath,
+                                          m_bedResult);
             }
 
             // enumerate_components() is called exactly once per calculateShells()
@@ -341,29 +323,30 @@ void CTImage::calculateShells()
                 vd_comps.reserve(vd_comps_raw.size());
                 for (const auto& ci : vd_comps_raw) {
                     BedDetector::VDComponentInfo vi;
-                    vi.id          = ci.id;
-                    vi.centroid_x  = ci.centroid_x;
-                    vi.centroid_y  = ci.centroid_y;
-                    vi.area        = ci.area;
+                    vi.id = ci.id;
+                    vi.centroid_x = ci.centroid_x;
+                    vi.centroid_y = ci.centroid_y;
+                    vi.area = ci.area;
                     vi.circularity = ci.circularity;
-                    vi.score       = ci.score;
+                    vi.score = ci.score;
                     vd_comps.push_back(vi);
                 }
 
                 // body0_cy: mean y of shell[0] vertices (Voronoi space)
                 double body0_cy = 0.0;
                 if (!m_shells.empty() && !m_shells[0].isEmpty()) {
-                    for (const auto& v : m_shells[0]) body0_cy += v.y;
+                    for (const auto& v : m_shells[0])
+                        body0_cy += v.y;
                     body0_cy /= static_cast<double>(m_shells[0].size());
                 }
 
                 BedDetector bd;
-                m_bedResult = bd.detect(vd_comps, m_image.data(), m_width, m_height,
-                                        body0_cy, BedDetector::Params{});
+                m_bedResult = bd.detect(vd_comps, m_image.data(), m_width, m_height, body0_cy,
+                                        BedDetector::Params{});
 
                 // Cache save (single slice upsert)
-                BedCache::save(cacheDir, m_beta, BedCache::ALGORITHM_VERSION,
-                               m_filepath, m_bedResult);
+                BedCache::save(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath,
+                               m_bedResult);
             }
 
             // --- body0 replacement ---
@@ -405,8 +388,8 @@ void CTImage::calculateShells()
         // =====================================================================
 
         calculateInnerShellsAdaptive(true);
-        m_algoPeelIndex   = calculateCuttingShell();
-        m_peelIndex       = m_algoPeelIndex;
+        m_algoPeelIndex = calculateCuttingShell();
+        m_peelIndex = m_algoPeelIndex;
 
     } catch (const std::exception& e) {
         throw VoronoiError(std::string(ErrorMessages::SHELL_CALC_ERROR) + ": " + e.what());
@@ -420,8 +403,7 @@ void CTImage::calculateShells()
 // that calculateInnerShellsAdaptive() can use them as seeds without repeating
 // the expensive biggest-component search.
 // =============================================================================
-void CTImage::extractOuterShell()
-{
+void CTImage::extractOuterShell() {
     assert(m_voronoi);
     V::ImageProcessingBC& bc = m_voronoi->bc;
 
@@ -455,9 +437,9 @@ void CTImage::extractOuterShell()
 // calculateInnerShellsAdaptive
 // Shell calculation using stored QuasiVertex references for traversal.
 // =============================================================================
-void CTImage::calculateInnerShellsAdaptive(bool maximize)
-{
-    if (!m_voronoi) return;
+void CTImage::calculateInnerShellsAdaptive(bool maximize) {
+    if (!m_voronoi)
+        return;
 
     // Time limit safety: record start time
     const auto calcStartTime = std::chrono::steady_clock::now();
@@ -471,12 +453,11 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
     std::vector<V::QuasiVertex> prevQVerts = m_voronoi->outerShellQVerts;
 
     // Incremental shell statistics for adaptive stopping (avoid repeated full traversal)
-    std::vector<std::pair<double,double>> statsPoints;
+    std::vector<std::pair<double, double>> statsPoints;
     if (EXCLUDE_OUTERMOST_SHELL && !m_shells.empty() && m_shells[0].hasStatistics()) {
         // shell[0] excluded from stats — start empty
     }
-    for (int si = (EXCLUDE_OUTERMOST_SHELL ? 1 : 0);
-         si < static_cast<int>(m_shells.size()); ++si) {
+    for (int si = (EXCLUDE_OUTERMOST_SHELL ? 1 : 0); si < static_cast<int>(m_shells.size()); ++si) {
         const CTShell& sh = m_shells[si];
         if (sh.hasStatistics())
             statsPoints.emplace_back(sh.mu(), sh.sigma());
@@ -515,8 +496,12 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
 
     // Calculate minimum shells first
     for (int i = static_cast<int>(m_shells.size()); i < ADAPTIVE_SHELL_MIN; ++i) {
-        if (prevQVerts.empty()) break;
-        if (elapsedSeconds() > ADAPTIVE_TIME_LIMIT_SECONDS) { m_timedOut = true; break; }
+        if (prevQVerts.empty())
+            break;
+        if (elapsedSeconds() > ADAPTIVE_TIME_LIMIT_SECONDS) {
+            m_timedOut = true;
+            break;
+        }
 
         std::vector<V::QuasiVertex> newQVerts;
         CTShell newShell = expandOneShell(newQVerts);
@@ -535,15 +520,16 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
     // Adaptive stopping: check every ADAPTIVE_CHECK_INTERVAL shells
     int consecutiveInside = 0;
 
-    for (int shellIdx = static_cast<int>(m_shells.size());
-         shellIdx < ADAPTIVE_SHELL_MAX; ++shellIdx)
-    {
-        if (prevQVerts.empty()) break;
+    for (int shellIdx = static_cast<int>(m_shells.size()); shellIdx < ADAPTIVE_SHELL_MAX;
+         ++shellIdx) {
+        if (prevQVerts.empty())
+            break;
 
         std::vector<V::QuasiVertex> newQVerts;
         CTShell newShell = expandOneShell(newQVerts);
 
-        if (newShell.isEmpty()) break;
+        if (newShell.isEmpty())
+            break;
 
         // Time limit check (primary safety mechanism)
         if (elapsedSeconds() > ADAPTIVE_TIME_LIMIT_SECONDS) {
@@ -562,22 +548,22 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
             const double np = static_cast<double>(statsPoints.size());
             double meanMu = 0.0, meanSigma = 0.0;
             for (auto& [mu, sigma] : statsPoints) {
-                meanMu    += mu;
+                meanMu += mu;
                 meanSigma += sigma;
             }
-            meanMu    /= np;
+            meanMu /= np;
             meanSigma /= np;
 
             double c00 = 0, c01 = 0, c11 = 0;
             for (auto& [mu, sigma] : statsPoints) {
-                double dm = mu    - meanMu;
+                double dm = mu - meanMu;
                 double ds = sigma - meanSigma;
                 c00 += dm * dm;
                 c01 += dm * ds;
                 c11 += ds * ds;
             }
             const double div = np - 1.0;
-            double cov[2][2] = {{c00/div, c01/div}, {c01/div, c11/div}};
+            double cov[2][2] = {{c00 / div, c01 / div}, {c01 / div, c11 / div}};
             double inv[2][2];
 
             if (ShellStatistics::invert2x2(cov, inv)) {
@@ -599,8 +585,7 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
     }
 }
 
-void CTImage::releaseVoronoi()
-{
+void CTImage::releaseVoronoi() {
     m_voronoi.reset();
 }
 
@@ -611,8 +596,7 @@ void CTImage::releaseVoronoi()
 // Calls select_biggest_componentBSFace() again to ensure state is correct,
 // then extracts the pixel mask via biggest_component_pixel_mask().
 // =============================================================================
-std::vector<char> CTImage::extractBiggestComponentMaskFromVoronoi()
-{
+std::vector<char> CTImage::extractBiggestComponentMaskFromVoronoi() {
     if (!m_voronoi) {
         throw VoronoiError(
             "extractBiggestComponentMaskFromVoronoi: Voronoi not available. "
@@ -627,14 +611,14 @@ std::vector<char> CTImage::extractBiggestComponentMaskFromVoronoi()
         // different biggest-component selection path.
         bc.select_biggest_componentBSFace();
 
-        std::vector<char> mask = bc.biggest_component_pixel_mask(
-            m_height, m_width, COORDINATE_OFFSET);
+        std::vector<char> mask =
+            bc.biggest_component_pixel_mask(m_height, m_width, COORDINATE_OFFSET);
 
         return mask;
 
     } catch (const std::exception& e) {
-        throw VoronoiError(
-            std::string("extractBiggestComponentMaskFromVoronoi failed: ") + e.what());
+        throw VoronoiError(std::string("extractBiggestComponentMaskFromVoronoi failed: ") +
+                           e.what());
     }
 }
 
@@ -644,8 +628,7 @@ std::vector<char> CTImage::extractBiggestComponentMaskFromVoronoi()
 // Must be called after calculateShells() and before releaseVoronoi().
 // Returns score-descending sorted vector (mirrors ImageProcessingBC::enumerate_components).
 // =============================================================================
-std::vector<CTImage::ComponentScoreInfo> CTImage::enumerateComponentScores()
-{
+std::vector<CTImage::ComponentScoreInfo> CTImage::enumerateComponentScores() {
     if (!m_voronoi) {
         throw VoronoiError(
             "enumerateComponentScores: Voronoi not available. "
@@ -659,16 +642,16 @@ std::vector<CTImage::ComponentScoreInfo> CTImage::enumerateComponentScores()
     result.reserve(raw.size());
     for (const auto& ci : raw) {
         ComponentScoreInfo info;
-        info.id                = ci.id;
-        info.centroid_x        = ci.centroid_x;
-        info.centroid_y        = ci.centroid_y;
-        info.area              = ci.area;
-        info.circularity       = ci.circularity;
-        info.score             = ci.score;
-        info.perimeter_total   = ci.perimeter_total;
+        info.id = ci.id;
+        info.centroid_x = ci.centroid_x;
+        info.centroid_y = ci.centroid_y;
+        info.area = ci.area;
+        info.circularity = ci.circularity;
+        info.score = ci.score;
+        info.perimeter_total = ci.perimeter_total;
         info.outer_loop_length = ci.outer_loop_length;
-        info.n_inner_loops     = ci.n_inner_loops;
-        info.n_outer_edges     = ci.n_outer_edges;
+        info.n_inner_loops = ci.n_inner_loops;
+        info.n_outer_edges = ci.n_outer_edges;
         result.push_back(info);
     }
     return result;
@@ -682,8 +665,7 @@ std::vector<CTImage::ComponentScoreInfo> CTImage::enumerateComponentScores()
 // subsequent biggest_component_pixel_mask() then returns that component's mask.
 // Must be called after calculateShells() and before releaseVoronoi().
 // =============================================================================
-std::vector<char> CTImage::extractComponentMaskById(int component_id)
-{
+std::vector<char> CTImage::extractComponentMaskById(int component_id) {
     if (!m_voronoi) {
         throw VoronoiError(
             "extractComponentMaskById: Voronoi not available. "
@@ -694,11 +676,9 @@ std::vector<char> CTImage::extractComponentMaskById(int component_id)
 
     try {
         bc.get_edge_of_outer_loop_of_componentBSFace(component_id);
-        return bc.biggest_component_pixel_mask(
-            m_height, m_width, COORDINATE_OFFSET);
+        return bc.biggest_component_pixel_mask(m_height, m_width, COORDINATE_OFFSET);
     } catch (const std::exception& e) {
-        throw VoronoiError(
-            std::string("extractComponentMaskById failed: ") + e.what());
+        throw VoronoiError(std::string("extractComponentMaskById failed: ") + e.what());
     }
 }
 
@@ -710,8 +690,7 @@ std::vector<char> CTImage::extractComponentMaskById(int component_id)
 // Inner-shell peeling, Mahalanobis, and bed detection are all skipped.
 // Voronoi object is released immediately after mask extraction.
 // =============================================================================
-std::vector<char> CTImage::computeBiggestComponentMask()
-{
+std::vector<char> CTImage::computeBiggestComponentMask() {
     try {
         // Build Voronoi / beta-complex (shared with calculateShells())
         buildAndClassifyVoronoi();
@@ -720,8 +699,8 @@ std::vector<char> CTImage::computeBiggestComponentMask()
         bc.select_biggest_componentBSFace();
 
         // Build H*W pixel mask
-        std::vector<char> mask = bc.biggest_component_pixel_mask(
-            m_height, m_width, COORDINATE_OFFSET);
+        std::vector<char> mask =
+            bc.biggest_component_pixel_mask(m_height, m_width, COORDINATE_OFFSET);
 
         // Release Voronoi immediately (~340 MB)
         m_voronoi.reset();
@@ -741,11 +720,12 @@ std::vector<char> CTImage::computeBiggestComponentMask()
 // Safe to call after calculateShells() + peelSkin() when DICOM export is NOT
 // needed.  After this call, applyPeeledToDicom() will throw std::logic_error.
 // =============================================================================
-void CTImage::releaseRawDicom()
-{
+void CTImage::releaseRawDicom() {
     // Shrink-to-fit the raw pixel buffer so glibc can reclaim the pages.
     // swap trick guarantees capacity is also released (vs. clear() alone).
-    { std::vector<uint16_t>().swap(m_originalImage); }
+    {
+        std::vector<uint16_t>().swap(m_originalImage);
+    }
 
     // Release the entire DCMTK DcmFileFormat tree (metadata + pixel data).
     // This is the larger allocation (~1 MB+ for pixel table + DICOM tags).
@@ -757,29 +737,32 @@ void CTImage::releaseRawDicom()
 // =============================================================================
 // Cutting point detection
 // =============================================================================
-int CTImage::calculateCuttingShell(CuttingAlgorithm algo)
-{
-    if (m_shells.size() < 2) return 0;
+int CTImage::calculateCuttingShell(CuttingAlgorithm algo) {
+    if (m_shells.size() < 2)
+        return 0;
 
     try {
         switch (algo) {
-            case CuttingAlgorithm::THREE_SIGMA:  return cutting3SigmaDistance();
-            case CuttingAlgorithm::GMM:          return cuttingGmmSequential();
-            case CuttingAlgorithm::EUCLIDEAN:    return cuttingEuclideanDistance();
+            case CuttingAlgorithm::THREE_SIGMA:
+                return cutting3SigmaDistance();
+            case CuttingAlgorithm::GMM:
+                return cuttingGmmSequential();
+            case CuttingAlgorithm::EUCLIDEAN:
+                return cuttingEuclideanDistance();
         }
     } catch (...) {
         std::fprintf(stderr,
-            "CTImage::calculateCuttingShell: cutting algorithm %d threw, "
-            "falling back to Euclidean distance\n", static_cast<int>(algo));
+                     "CTImage::calculateCuttingShell: cutting algorithm %d threw, "
+                     "falling back to Euclidean distance\n",
+                     static_cast<int>(algo));
         return cuttingEuclideanDistance();
     }
     return cuttingEuclideanDistance();
 }
 
-std::vector<std::pair<double,double>>
-CTImage::extractShellStatistics(bool excludeOutermost) const
-{
-    std::vector<std::pair<double,double>> pts;
+std::vector<std::pair<double, double>> CTImage::extractShellStatistics(
+    bool excludeOutermost) const {
+    std::vector<std::pair<double, double>> pts;
     int startIdx = excludeOutermost ? 1 : 0;
     for (int i = startIdx; i < static_cast<int>(m_shells.size()); ++i) {
         const CTShell& sh = m_shells[i];
@@ -798,15 +781,13 @@ CTImage::extractShellStatistics(bool excludeOutermost) const
 // effect) + per-shell bookkeeping (m_shellMahalD/m_shellInside) stay here;
 // the actual math is in ShellStatistics (S1 extraction).
 // =============================================================================
-int CTImage::cuttingEuclideanDistance()
-{
+int CTImage::cuttingEuclideanDistance() {
     auto points = extractShellStatistics();
     const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
     return ShellStatistics::cuttingEuclideanDistance(points, offset);
 }
 
-int CTImage::cutting3SigmaDistance()
-{
+int CTImage::cutting3SigmaDistance() {
     auto points = extractShellStatistics();
 
     // Initialize per-shell vectors (size = m_shells.size())
@@ -815,8 +796,8 @@ int CTImage::cutting3SigmaDistance()
     m_shellInside.assign(nShells, false);
 
     const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
-    auto result = ShellStatistics::cutting3SigmaDistance(
-        points, offset, SIGMA_THRESHOLD, DISTANCE_JUMP_SIGMA);
+    auto result = ShellStatistics::cutting3SigmaDistance(points, offset, SIGMA_THRESHOLD,
+                                                         DISTANCE_JUMP_SIGMA);
 
     if (!result.computed) {
         // points.size() < 4, or singular covariance — same fallback as before.
@@ -837,8 +818,7 @@ int CTImage::cutting3SigmaDistance()
     return result.cuttingIndex;
 }
 
-int CTImage::cuttingGmmSequential()
-{
+int CTImage::cuttingGmmSequential() {
     // GMM not yet implemented — fall back to Euclidean
     return cuttingEuclideanDistance();
 }
@@ -846,72 +826,80 @@ int CTImage::cuttingGmmSequential()
 // =============================================================================
 // Skin Peeling
 // =============================================================================
-void CTImage::peelSkin(PeelRegion region)
-{
-    if (m_shells.empty()) return;
+void CTImage::peelSkin(PeelRegion region) {
+    if (m_shells.empty())
+        return;
 
     for (int si = 0; si <= m_peelIndex && si < static_cast<int>(m_shells.size()); ++si) {
         for (const auto& vdata : m_shells[si]) {
-            auto [row, col] = CoordinateTransform::voronoiToImagePixel(
-                vdata.x, vdata.y, m_height, m_width);
+            auto [row, col] =
+                CoordinateTransform::voronoiToImagePixel(vdata.x, vdata.y, m_height, m_width);
 
             if (!CoordinateTransform::isValidPixel(row, col, m_height, m_width))
                 continue;
 
             // Region filter (image coordinates: row↓, col→)
             switch (region) {
-            case PeelRegion::UpperHalf: if (row >= m_height / 2) continue; break;
-            case PeelRegion::LowerHalf: if (row <  m_height / 2) continue; break;
-            case PeelRegion::LeftHalf:  if (col >= m_width  / 2) continue; break;
-            case PeelRegion::RightHalf: if (col <  m_width  / 2) continue; break;
-            case PeelRegion::WholeBody: break;
+                case PeelRegion::UpperHalf:
+                    if (row >= m_height / 2)
+                        continue;
+                    break;
+                case PeelRegion::LowerHalf:
+                    if (row < m_height / 2)
+                        continue;
+                    break;
+                case PeelRegion::LeftHalf:
+                    if (col >= m_width / 2)
+                        continue;
+                    break;
+                case PeelRegion::RightHalf:
+                    if (col < m_width / 2)
+                        continue;
+                    break;
+                case PeelRegion::WholeBody:
+                    break;
             }
 
-            m_image[row * m_width + col]         = 0;
+            m_image[row * m_width + col] = 0;
             m_originalImage[row * m_width + col] = m_minIntensity;
         }
     }
     m_peeled = true;
 }
 
-void CTImage::halfPeelSkin()
-{
+void CTImage::halfPeelSkin() {
     peelSkin(PeelRegion::RightHalf);
 }
 
 // =============================================================================
 // Apply peeled pixels back into DCMTK dataset for saving
 // =============================================================================
-void CTImage::applyPeeledToDicom()
-{
+void CTImage::applyPeeledToDicom() {
     if (m_rawDicomReleased)
         throw std::logic_error(
             "CTImage::applyPeeledToDicom(): raw DICOM buffers have been released "
             "via releaseRawDicom(). Cannot save DICOM after raw data is freed.");
 
     DcmDataset* ds = m_fileFormat->getDataset();
-    ds->putAndInsertUint16Array(
-        DCM_PixelData,
-        m_originalImage.data(),
-        static_cast<unsigned long>(m_originalImage.size()));
+    ds->putAndInsertUint16Array(DCM_PixelData, m_originalImage.data(),
+                                static_cast<unsigned long>(m_originalImage.size()));
 }
 
 // =============================================================================
 // Statistics snapshot
 // =============================================================================
-CTImage::Stats CTImage::collectStats() const
-{
+CTImage::Stats CTImage::collectStats() const {
     Stats s;
-    s.filename   = m_filepath;
-    s.peelIndex  = m_peelIndex;
+    s.filename = m_filepath;
+    s.peelIndex = m_peelIndex;
     s.shellCount = static_cast<int>(m_shells.size());
-    s.isPeeled   = m_peeled;
+    s.isPeeled = m_peeled;
 
     if (!m_shells.empty() && m_peelIndex < static_cast<int>(m_shells.size())) {
         const CTShell& sh = m_shells[m_peelIndex];
         if (sh.hasStatistics()) {
-            s.mu       = sh.mu();
-            s.sigma    = sh.sigma();
+            s.mu = sh.mu();
+            s.sigma = sh.sigma();
             s.hasStats = true;
         }
     }

@@ -33,16 +33,13 @@ namespace {
 // to avoid flicker on the common fast case. Peel All uses a determinate bar
 // shown immediately instead (see onPeelAllFiles).
 constexpr int kBusyIndicatorDelayMs = 20000;
-}
+}  // namespace
 
 // =============================================================================
 // Construction
 // =============================================================================
 
-MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent)
-    , m_ui(new Ui::MainWindow)
-{
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), m_ui(new Ui::MainWindow) {
     m_ui->setupUi(this);
 
     m_scene = new SkinPeelerScene(this);
@@ -53,39 +50,51 @@ MainWindow::MainWindow(QWidget* parent)
     m_ui->graphicsView->installEventFilter(this);
 
     // File I/O
-    connect(m_ui->pushButton_OpenDICOMfiles,   &QPushButton::clicked, this, &MainWindow::onOpenDICOM);
-    connect(m_ui->pushButton_SaveChanges,      &QPushButton::clicked, this, &MainWindow::onSaveDICOM);
-    connect(m_ui->pushButton_ExportStatistics, &QPushButton::clicked, this, &MainWindow::onExportStatistics);
+    connect(m_ui->pushButton_OpenDICOMfiles, &QPushButton::clicked, this, &MainWindow::onOpenDICOM);
+    connect(m_ui->pushButton_SaveChanges, &QPushButton::clicked, this, &MainWindow::onSaveDICOM);
+    connect(m_ui->pushButton_ExportStatistics, &QPushButton::clicked, this,
+            &MainWindow::onExportStatistics);
 
     // Navigation
-    connect(m_ui->lineEdit_CurrSection, &QLineEdit::returnPressed, this, &MainWindow::onMoveToIndex);
+    connect(m_ui->lineEdit_CurrSection, &QLineEdit::returnPressed, this,
+            &MainWindow::onMoveToIndex);
 
     // Peeling mode
-    connect(m_ui->radioButton_Automatic,         &QRadioButton::clicked, this, &MainWindow::onAutomaticModeClicked);
-    connect(m_ui->radioButton_CustomizeInterval, &QRadioButton::clicked, this, &MainWindow::onCustomizeIntervalModeClicked);
-    connect(m_ui->lineEdit_Interval, &QLineEdit::returnPressed, this, &MainWindow::onIntervalChanged);
+    connect(m_ui->radioButton_Automatic, &QRadioButton::clicked, this,
+            &MainWindow::onAutomaticModeClicked);
+    connect(m_ui->radioButton_CustomizeInterval, &QRadioButton::clicked, this,
+            &MainWindow::onCustomizeIntervalModeClicked);
+    connect(m_ui->lineEdit_Interval, &QLineEdit::returnPressed, this,
+            &MainWindow::onIntervalChanged);
 
     // Peeling parameters
     connect(m_ui->doubleSpinBox_DetectionProbe,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, &MainWindow::onDetectionProbeChanged);
+            QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
+            &MainWindow::onDetectionProbeChanged);
     connect(m_ui->pushButton_Analysis, &QPushButton::clicked, this, &MainWindow::onAnalysis);
-    connect(m_ui->doubleSpinBox_SkinThickness,
-            QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+    connect(m_ui->doubleSpinBox_SkinThickness, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &MainWindow::onSkinThicknessEdited);
 
     // Visualization
-    connect(m_ui->radioButton_WholeBody,  &QRadioButton::clicked, this, &MainWindow::onVisualizeWholeBody);
-    connect(m_ui->radioButton_UpperHalf,  &QRadioButton::clicked, this, &MainWindow::onVisualizeUpperHalf);
-    connect(m_ui->radioButton_LowerHalf,  &QRadioButton::clicked, this, &MainWindow::onVisualizeLowerHalf);
-    connect(m_ui->radioButton_LeftHalf,   &QRadioButton::clicked, this, &MainWindow::onVisualizeLeftHalf);
-    connect(m_ui->radioButton_RightHalf,  &QRadioButton::clicked, this, &MainWindow::onVisualizeRightHalf);
-    connect(m_ui->checkBox_ShowSkin,  &QCheckBox::toggled, this, &MainWindow::onShowSkinToggled);
-    connect(m_ui->pushButton_SkinColor, &QPushButton::clicked, this, &MainWindow::onSkinColorPicker);
+    connect(m_ui->radioButton_WholeBody, &QRadioButton::clicked, this,
+            &MainWindow::onVisualizeWholeBody);
+    connect(m_ui->radioButton_UpperHalf, &QRadioButton::clicked, this,
+            &MainWindow::onVisualizeUpperHalf);
+    connect(m_ui->radioButton_LowerHalf, &QRadioButton::clicked, this,
+            &MainWindow::onVisualizeLowerHalf);
+    connect(m_ui->radioButton_LeftHalf, &QRadioButton::clicked, this,
+            &MainWindow::onVisualizeLeftHalf);
+    connect(m_ui->radioButton_RightHalf, &QRadioButton::clicked, this,
+            &MainWindow::onVisualizeRightHalf);
+    connect(m_ui->checkBox_ShowSkin, &QCheckBox::toggled, this, &MainWindow::onShowSkinToggled);
+    connect(m_ui->pushButton_SkinColor, &QPushButton::clicked, this,
+            &MainWindow::onSkinColorPicker);
 
     // Peeling actions
-    connect(m_ui->pushButton_PeelCurrentSlice, &QPushButton::clicked, this, &MainWindow::onPeelCurrentSlice);
-    connect(m_ui->pushButton_PeelAllFiles,     &QPushButton::clicked, this, &MainWindow::onPeelAllFiles);
+    connect(m_ui->pushButton_PeelCurrentSlice, &QPushButton::clicked, this,
+            &MainWindow::onPeelCurrentSlice);
+    connect(m_ui->pushButton_PeelAllFiles, &QPushButton::clicked, this,
+            &MainWindow::onPeelAllFiles);
 
     // Help
     connect(m_ui->actionUserGuide, &QAction::triggered, this, &MainWindow::onShowManual);
@@ -124,28 +133,27 @@ MainWindow::MainWindow(QWidget* parent)
         m_btnAnnExport->setToolTip("Save annotated PNG + binary mask");
         toolbar->addWidget(m_btnAnnExport);
 
-        connect(m_btnAnnotate,  &QPushButton::toggled, this, &MainWindow::onAnnotationToggle);
-        connect(m_btnAnnClear,  &QPushButton::clicked, this, &MainWindow::onAnnotationClear);
+        connect(m_btnAnnotate, &QPushButton::toggled, this, &MainWindow::onAnnotationToggle);
+        connect(m_btnAnnClear, &QPushButton::clicked, this, &MainWindow::onAnnotationClear);
         connect(m_btnAnnExport, &QPushButton::clicked, this, &MainWindow::onAnnotationExport);
 
-        connect(m_ui->graphicsView, &SkinPeelerView::annotationPaint,
-                this, &MainWindow::onAnnotationPaint);
+        connect(m_ui->graphicsView, &SkinPeelerView::annotationPaint, this,
+                &MainWindow::onAnnotationPaint);
     }
 
     resetUIState();
     applySkinColorToButton();
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow() {
     delete m_ui;
 }
 
-void MainWindow::closeEvent(QCloseEvent* event)
-{
+void MainWindow::closeEvent(QCloseEvent* event) {
     if (m_calcRunning) {
         // Block close during shell calculation to prevent dangling pointer
-        QMessageBox::information(this, "Calculating",
+        QMessageBox::information(
+            this, "Calculating",
             "Shell calculation is in progress. Please wait until it completes.");
         event->ignore();
     } else {
@@ -157,15 +165,15 @@ void MainWindow::closeEvent(QCloseEvent* event)
 // File I/O
 // =============================================================================
 
-void MainWindow::onOpenDICOM()
-{
-    QString dir = QFileDialog::getExistingDirectory(
-        this, "Open DICOM Folder", QDir::currentPath());
-    if (dir.isEmpty()) return;
+void MainWindow::onOpenDICOM() {
+    QString dir = QFileDialog::getExistingDirectory(this, "Open DICOM Folder", QDir::currentPath());
+    if (dir.isEmpty())
+        return;
 
     // Defensive — UI is disabled while m_calcRunning, so this button should
     // not be reachable, but guard anyway per the single-concurrent-op rule.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     m_images.clear();
     m_peeled = false;
@@ -176,7 +184,8 @@ void MainWindow::onOpenDICOM()
     m_progressBar->setRange(0, 0);  // indeterminate (Peel All leaves it determinate)
 
     QTimer::singleShot(kBusyIndicatorDelayMs, this, [this]() {
-        if (m_calcRunning) m_progressBar->setVisible(true);
+        if (m_calcRunning)
+            m_progressBar->setVisible(true);
     });
 
     // DicomService::loadDirectory() + the first slice's calculateShells() run
@@ -212,7 +221,7 @@ void MainWindow::onOpenDICOM()
 
             if (m_images.empty()) {
                 QMessageBox::warning(this, "No Files",
-                    "No valid DICOM files found in the selected folder.");
+                                     "No valid DICOM files found in the selected folder.");
                 statusBar()->clearMessage();
                 return;
             }
@@ -238,13 +247,13 @@ void MainWindow::onOpenDICOM()
         });
 }
 
-void MainWindow::onSaveDICOM()
-{
-    if (m_images.empty()) return;
+void MainWindow::onSaveDICOM() {
+    if (m_images.empty())
+        return;
 
-    QString dir = QFileDialog::getExistingDirectory(
-        this, "Save Peeled DICOM", QDir::currentPath());
-    if (dir.isEmpty()) return;
+    QString dir = QFileDialog::getExistingDirectory(this, "Save Peeled DICOM", QDir::currentPath());
+    if (dir.isEmpty())
+        return;
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
     statusBar()->showMessage("Saving...");
@@ -256,13 +265,14 @@ void MainWindow::onSaveDICOM()
         QString("Saved %1 / %2 files to %3").arg(saved).arg(m_images.size()).arg(dir));
 }
 
-void MainWindow::onExportStatistics()
-{
-    if (m_images.empty()) return;
+void MainWindow::onExportStatistics() {
+    if (m_images.empty())
+        return;
 
-    QString path = QFileDialog::getSaveFileName(
-        this, "Export Statistics", QDir::currentPath(), "Text files (*.txt)");
-    if (path.isEmpty()) return;
+    QString path = QFileDialog::getSaveFileName(this, "Export Statistics", QDir::currentPath(),
+                                                "Text files (*.txt)");
+    if (path.isEmpty())
+        return;
 
     auto stats = StatisticsService::collect(m_images);
     if (!StatisticsService::saveToFile(path.toStdString(), stats)) {
@@ -276,27 +286,23 @@ void MainWindow::onExportStatistics()
 // Navigation
 // =============================================================================
 
-void MainWindow::onPrev()
-{
+void MainWindow::onPrev() {
     if (m_currentIndex > 0)
         navigateToImage(m_currentIndex - 1);
 }
 
-void MainWindow::onNext()
-{
+void MainWindow::onNext() {
     if (m_currentIndex < static_cast<int>(m_images.size()) - 1)
         navigateToImage(m_currentIndex + 1);
 }
 
-void MainWindow::onMoveToIndex()
-{
+void MainWindow::onMoveToIndex() {
     int idx = m_ui->lineEdit_CurrSection->text().toInt() - 1;
     idx = std::clamp(idx, 0, static_cast<int>(m_images.size()) - 1);
     navigateToImage(idx);
 }
 
-void MainWindow::navigateToImage(int index)
-{
+void MainWindow::navigateToImage(int index) {
     if (m_images.empty() || index < 0 || index >= static_cast<int>(m_images.size()))
         return;
 
@@ -311,7 +317,8 @@ void MainWindow::navigateToImage(int index)
         // (e.g. holding an arrow key) must coalesce into a single eventual
         // calculation instead of queuing every intermediate slice.
         m_pendingNavIndex = index;
-        statusBar()->showMessage("Busy — navigation will resume once the current operation finishes...");
+        statusBar()->showMessage(
+            "Busy — navigation will resume once the current operation finishes...");
         return;
     }
 
@@ -320,7 +327,8 @@ void MainWindow::navigateToImage(int index)
     drawCurrentCT();
 
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
 
     // Sync beta — if spinbox value differs from stored beta, update and clear shells.
     double spinBeta = currentBeta();
@@ -339,11 +347,12 @@ void MainWindow::navigateToImage(int index)
     drawShellOverlays();
 }
 
-void MainWindow::startSliceShellCalc(int index)
-{
-    if (index < 0 || index >= static_cast<int>(m_images.size())) return;
+void MainWindow::startSliceShellCalc(int index) {
+    if (index < 0 || index >= static_cast<int>(m_images.size()))
+        return;
     CTImage* img = m_images[index].get();
-    if (!img) return;
+    if (!img)
+        return;
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
     setUIEnabled(false);
@@ -351,7 +360,8 @@ void MainWindow::startSliceShellCalc(int index)
     m_progressBar->setRange(0, 0);  // indeterminate
 
     QTimer::singleShot(kBusyIndicatorDelayMs, this, [this]() {
-        if (m_calcRunning) m_progressBar->setVisible(true);
+        if (m_calcRunning)
+            m_progressBar->setVisible(true);
     });
 
     runEngineTask(
@@ -362,7 +372,8 @@ void MainWindow::startSliceShellCalc(int index)
             setUIEnabled(true);
 
             if (!ok) {
-                QMessageBox::warning(this, "Shell Calculation Error",
+                QMessageBox::warning(
+                    this, "Shell Calculation Error",
                     QString("Failed to calculate shells:\n%1").arg(QString::fromStdString(errMsg)));
                 statusBar()->showMessage("Shell calculation failed.");
                 return;
@@ -386,18 +397,15 @@ void MainWindow::startSliceShellCalc(int index)
 // Peeling mode
 // =============================================================================
 
-void MainWindow::onAutomaticModeClicked()
-{
+void MainWindow::onAutomaticModeClicked() {
     m_ui->lineEdit_Interval->setEnabled(false);
 }
 
-void MainWindow::onCustomizeIntervalModeClicked()
-{
+void MainWindow::onCustomizeIntervalModeClicked() {
     m_ui->lineEdit_Interval->setEnabled(true);
 }
 
-void MainWindow::onIntervalChanged()
-{
+void MainWindow::onIntervalChanged() {
     bool ok = false;
     int val = m_ui->lineEdit_Interval->text().toInt(&ok);
     if (ok && val > 0) {
@@ -409,14 +417,15 @@ void MainWindow::onIntervalChanged()
 // Peeling parameters
 // =============================================================================
 
-void MainWindow::onDetectionProbeChanged(double value)
-{
+void MainWindow::onDetectionProbeChanged(double value) {
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
 
     // Defensive — the spinbox lives in centralWidget and is disabled while
     // m_calcRunning, so this should not be reachable mid-task.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     img->setBeta(value);  // internally clears shells (cheap, no engine call)
 
@@ -426,7 +435,8 @@ void MainWindow::onDetectionProbeChanged(double value)
     m_progressBar->setRange(0, 0);  // indeterminate
 
     QTimer::singleShot(kBusyIndicatorDelayMs, this, [this]() {
-        if (m_calcRunning) m_progressBar->setVisible(true);
+        if (m_calcRunning)
+            m_progressBar->setVisible(true);
     });
 
     runEngineTask(
@@ -437,7 +447,8 @@ void MainWindow::onDetectionProbeChanged(double value)
             setUIEnabled(true);
 
             if (!ok) {
-                QMessageBox::warning(this, "Shell Calculation Error",
+                QMessageBox::warning(
+                    this, "Shell Calculation Error",
                     QString("Failed to calculate shells:\n%1").arg(QString::fromStdString(errMsg)));
                 statusBar()->showMessage("Shell calculation failed.");
                 return;
@@ -456,14 +467,15 @@ void MainWindow::onDetectionProbeChanged(double value)
         });
 }
 
-void MainWindow::onAnalysis()
-{
+void MainWindow::onAnalysis() {
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
 
     // Defensive — the Analysis button lives in centralWidget and is disabled
     // while m_calcRunning, so this should not be reachable mid-task.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     // calculateShells() always maximizes. If shells already exist, reuse them.
     if (img->hasShells()) {
@@ -482,32 +494,31 @@ void MainWindow::onAnalysis()
         }
     });
 
-    runEngineTask(
-        [img]() { img->calculateShells(); },
-        [this](bool ok, const std::string& errMsg) { onShellCalcFinished(ok, errMsg); });
+    runEngineTask([img]() { img->calculateShells(); },
+                  [this](bool ok, const std::string& errMsg) { onShellCalcFinished(ok, errMsg); });
 }
 
-void MainWindow::onShellCalcFinished(bool success, const std::string& errMsg)
-{
+void MainWindow::onShellCalcFinished(bool success, const std::string& errMsg) {
     // m_calcRunning is reset by runEngineTask() before this runs.
     m_progressBar->setVisible(false);
     setUIEnabled(true);
 
     if (!success) {
-        QMessageBox::warning(this, "Shell Calculation Error",
+        QMessageBox::warning(
+            this, "Shell Calculation Error",
             QString("Failed to calculate shells:\n%1").arg(QString::fromStdString(errMsg)));
         statusBar()->showMessage("Shell calculation failed.");
         return;
     }
 
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
 
     continueAnalysis(img);
 }
 
-void MainWindow::continueAnalysis(CTImage* img)
-{
+void MainWindow::continueAnalysis(CTImage* img) {
     // extractShellStatistics(excludeOutermost=true) returns a stats array where
     // index 0 corresponds to m_shells[1] (the outermost shell is excluded).
     // GaussianPlotWidget and ScatterPlotWidget consume stats-array indices, so
@@ -532,7 +543,7 @@ void MainWindow::continueAnalysis(CTImage* img)
     // stats is already in stats-index space (excludeOutermost applied).
     {
         const int maxStatsIdx = std::max(0, static_cast<int>(stats.size()) - 1);
-        calcPeelIdx   = std::clamp(calcPeelIdx,   0, maxStatsIdx);
+        calcPeelIdx = std::clamp(calcPeelIdx, 0, maxStatsIdx);
         currThickness = std::clamp(currThickness, 0, maxStatsIdx);
     }
 
@@ -558,9 +569,11 @@ void MainWindow::continueAnalysis(CTImage* img)
         if (img->timedOut())
             report += QString("[Note: shell calculation stopped at time limit]\n");
         report += QString("Algorithm cut: s%1 (0-based index %2)\n")
-                      .arg(calcPeelIdx + 1).arg(calcPeelIdx);
+                      .arg(calcPeelIdx + 1)
+                      .arg(calcPeelIdx);
         report += QString("Current user setting: s%1 (0-based index %2)\n\n")
-                      .arg(currThickness + 1).arg(currThickness);
+                      .arg(currThickness + 1)
+                      .arg(currThickness);
 
         report += "Shell Stats (shell#: mu +/- sigma):\n";
         int displayLimit = std::min(10, totalShells);
@@ -569,7 +582,7 @@ void MainWindow::continueAnalysis(CTImage* img)
             if (sh.hasStatistics()) {
                 report += QString("  s%1: %2 +/- %3\n")
                               .arg(i + 1)
-                              .arg(sh.mu(),    0, 'f', 4)
+                              .arg(sh.mu(), 0, 'f', 4)
                               .arg(sh.sigma(), 0, 'f', 4);
             } else {
                 report += QString("  s%1: (no stats)\n").arg(i + 1);
@@ -583,8 +596,8 @@ void MainWindow::continueAnalysis(CTImage* img)
             if (distStats.valid) {
                 report += "\nInter-shell distances:\n";
                 report += QString("  Mean: %1\n").arg(distStats.mean, 0, 'f', 4);
-                report += QString("  Max:  %1\n").arg(distStats.max,  0, 'f', 4);
-                report += QString("  Min:  %1\n").arg(distStats.min,  0, 'f', 4);
+                report += QString("  Max:  %1\n").arg(distStats.max, 0, 'f', 4);
+                report += QString("  Min:  %1\n").arg(distStats.min, 0, 'f', 4);
             }
         }
 
@@ -593,26 +606,28 @@ void MainWindow::continueAnalysis(CTImage* img)
     }
 
     if (!stats.empty()) {
-        auto* gaussPlot   = new GaussianPlotWidget(stats, calcPeelIdx, currThickness);
+        auto* gaussPlot = new GaussianPlotWidget(stats, calcPeelIdx, currThickness);
         auto* scatterPlot = new ScatterPlotWidget(stats, calcPeelIdx, currThickness);
-        auto* histPlot    = new HistogramWidget(stats);
+        auto* histPlot = new HistogramWidget(stats);
 
-        auto* w1 = new PlotWindow(gaussPlot,   "Gaussian Distribution",  this);
-        auto* w2 = new PlotWindow(scatterPlot, "Shell-wise Profile",      this);
-        auto* w3 = new PlotWindow(histPlot,    "Inter-Shell Distance",    this);
+        auto* w1 = new PlotWindow(gaussPlot, "Gaussian Distribution", this);
+        auto* w2 = new PlotWindow(scatterPlot, "Shell-wise Profile", this);
+        auto* w3 = new PlotWindow(histPlot, "Inter-Shell Distance", this);
 
         w1->setAttribute(Qt::WA_DeleteOnClose);
         w2->setAttribute(Qt::WA_DeleteOnClose);
         w3->setAttribute(Qt::WA_DeleteOnClose);
 
-        w1->move(100, 100);  w1->show();
-        w2->move(820, 100);  w2->show();
-        w3->move(100, 600);  w3->show();
+        w1->move(100, 100);
+        w1->show();
+        w2->move(820, 100);
+        w2->show();
+        w3->move(100, 600);
+        w3->show();
     }
 }
 
-void MainWindow::setUIEnabled(bool enabled)
-{
+void MainWindow::setUIEnabled(bool enabled) {
     // Disable/enable the central widget to block all user interaction
     // during background shell calculation
     if (centralWidget())
@@ -622,44 +637,61 @@ void MainWindow::setUIEnabled(bool enabled)
     // addToolBar()), so its buttons are NOT descendants of centralWidget and
     // would otherwise stay clickable during a background engine task. Their
     // handlers read/write CTImage state, so they must be gated the same way.
-    if (m_btnAnnotate)  m_btnAnnotate->setEnabled(enabled);
-    if (m_btnAnnClear)  m_btnAnnClear->setEnabled(enabled);
-    if (m_btnAnnExport) m_btnAnnExport->setEnabled(enabled);
+    if (m_btnAnnotate)
+        m_btnAnnotate->setEnabled(enabled);
+    if (m_btnAnnClear)
+        m_btnAnnClear->setEnabled(enabled);
+    if (m_btnAnnExport)
+        m_btnAnnExport->setEnabled(enabled);
 }
 
-void MainWindow::onSkinThicknessEdited(double value)
-{
+void MainWindow::onSkinThicknessEdited(double value) {
     CTImage* img = currentImage();
-    if (!img || !img->hasShells()) return;
-    if (value < 1.0) return;  // 0 = "not set yet" sentinel; ignore
+    if (!img || !img->hasShells())
+        return;
+    if (value < 1.0)
+        return;  // 0 = "not set yet" sentinel; ignore
 
     // Spinbox shows s-label number → convert to 0-based m_shells peelIndex
     int t = ShellIndex::toShellsIdx(static_cast<int>(value));
     t = std::max(0, std::min(t, static_cast<int>(img->shells().size()) - 1));
     img->setPeelIndex(t);
-    drawShellOverlays();   // Update overlay only, without recalculating shells
+    drawShellOverlays();  // Update overlay only, without recalculating shells
 }
 
 // =============================================================================
 // Visualization
 // =============================================================================
 
-void MainWindow::onVisualizeWholeBody()  { m_vizMode = VisualizationMode::WholeBody;  drawShellOverlays(); }
-void MainWindow::onVisualizeUpperHalf()  { m_vizMode = VisualizationMode::UpperHalf;  drawShellOverlays(); }
-void MainWindow::onVisualizeLowerHalf()  { m_vizMode = VisualizationMode::LowerHalf;  drawShellOverlays(); }
-void MainWindow::onVisualizeLeftHalf()   { m_vizMode = VisualizationMode::LeftHalf;   drawShellOverlays(); }
-void MainWindow::onVisualizeRightHalf()  { m_vizMode = VisualizationMode::RightHalf;  drawShellOverlays(); }
+void MainWindow::onVisualizeWholeBody() {
+    m_vizMode = VisualizationMode::WholeBody;
+    drawShellOverlays();
+}
+void MainWindow::onVisualizeUpperHalf() {
+    m_vizMode = VisualizationMode::UpperHalf;
+    drawShellOverlays();
+}
+void MainWindow::onVisualizeLowerHalf() {
+    m_vizMode = VisualizationMode::LowerHalf;
+    drawShellOverlays();
+}
+void MainWindow::onVisualizeLeftHalf() {
+    m_vizMode = VisualizationMode::LeftHalf;
+    drawShellOverlays();
+}
+void MainWindow::onVisualizeRightHalf() {
+    m_vizMode = VisualizationMode::RightHalf;
+    drawShellOverlays();
+}
 
-void MainWindow::onShowSkinToggled(bool checked)
-{
+void MainWindow::onShowSkinToggled(bool checked) {
     if (checked)
         drawShellOverlays();
     else
         m_scene->clearShellOverlays();
 }
 
-void MainWindow::onSkinColorPicker()
-{
+void MainWindow::onSkinColorPicker() {
     QColor color = QColorDialog::getColor(m_skinColor, this, "Select Skin Color");
     if (color.isValid()) {
         m_skinColor = color;
@@ -673,19 +705,21 @@ void MainWindow::onSkinColorPicker()
 // Peeling actions
 // =============================================================================
 
-void MainWindow::onPeelCurrentSlice()
-{
+void MainWindow::onPeelCurrentSlice() {
     // Defensive — the button lives in centralWidget and is disabled while
     // m_calcRunning, so this should not be reachable mid-task. See
     // runEngineTask()'s concurrency contract in MainWindow.h.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
 
     // Spinbox shows s-label number → convert to 0-based m_shells peelIndex before peeling
     int dispThickness = static_cast<int>(m_ui->doubleSpinBox_SkinThickness->value());
-    if (dispThickness >= 1) img->setPeelIndex(ShellIndex::toShellsIdx(dispThickness));
+    if (dispThickness >= 1)
+        img->setPeelIndex(ShellIndex::toShellsIdx(dispThickness));
 
     img->peelSkin(currentPeelRegion());
     drawCurrentCT();
@@ -698,13 +732,14 @@ void MainWindow::onPeelCurrentSlice()
     statusBar()->showMessage(QString("Peeled slice %1").arg(m_currentIndex + 1));
 }
 
-void MainWindow::onPeelAllFiles()
-{
-    if (m_images.empty()) return;
+void MainWindow::onPeelAllFiles() {
+    if (m_images.empty())
+        return;
 
     // Defensive — the button lives in centralWidget and is disabled while
     // m_calcRunning, so this should not be reachable mid-task.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     PeelRegion region = currentPeelRegion();
     const int total = static_cast<int>(m_images.size());
@@ -718,8 +753,8 @@ void MainWindow::onPeelAllFiles()
     std::vector<int> sections;
     std::vector<int> thicknesses;
     if (!autoMode) {
-        int globalThickness = ShellIndex::toShellsIdx(
-            static_cast<int>(m_ui->doubleSpinBox_SkinThickness->value()));
+        int globalThickness =
+            ShellIndex::toShellsIdx(static_cast<int>(m_ui->doubleSpinBox_SkinThickness->value()));
         int numSections = std::max(1, std::min(m_intervalSections, total));
         sections = PeelingService::computeSectionIndices(total, numSections);
         thicknesses.assign(sections.size(), globalThickness);
@@ -738,24 +773,25 @@ void MainWindow::onPeelAllFiles()
 
     // Progress callback is invoked from the worker thread between slices —
     // marshal to the GUI thread before touching any widget.
-    PeelingService::ProgressCallback progressCb =
-        [this](int completed, int taskTotal) {
-            QMetaObject::invokeMethod(this, [this, completed, taskTotal]() {
+    PeelingService::ProgressCallback progressCb = [this](int completed, int taskTotal) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, completed, taskTotal]() {
                 m_progressBar->setValue(completed);
                 statusBar()->showMessage(
                     QString("Peeling slice %1 / %2...").arg(completed).arg(taskTotal));
-            }, Qt::QueuedConnection);
-        };
-    PeelingService::CancelCallback cancelCb =
-        [this]() { return m_peelCancelRequested.load(); };
+            },
+            Qt::QueuedConnection);
+    };
+    PeelingService::CancelCallback cancelCb = [this]() { return m_peelCancelRequested.load(); };
 
     runEngineTask(
         [this, region, autoMode, sections, thicknesses, progressCb, cancelCb]() {
             if (autoMode) {
                 PeelingService::peelAutoMode(m_images, 0, region, progressCb, cancelCb);
             } else {
-                PeelingService::peelUniformMode(
-                    m_images, sections, thicknesses, region, progressCb, cancelCb);
+                PeelingService::peelUniformMode(m_images, sections, thicknesses, region, progressCb,
+                                                cancelCb);
             }
         },
         [this](bool ok, const std::string& errMsg) {
@@ -777,8 +813,8 @@ void MainWindow::onPeelAllFiles()
 
             if (!ok) {
                 QMessageBox::warning(this, "Peeling Error",
-                    QString("Peeling stopped due to an error:\n%1")
-                        .arg(QString::fromStdString(errMsg)));
+                                     QString("Peeling stopped due to an error:\n%1")
+                                         .arg(QString::fromStdString(errMsg)));
                 statusBar()->showMessage("Peeling failed.");
             } else if (m_peelCancelRequested) {
                 statusBar()->showMessage("Peeling cancelled.");
@@ -788,8 +824,7 @@ void MainWindow::onPeelAllFiles()
         });
 }
 
-void MainWindow::onPeelAllCancelClicked()
-{
+void MainWindow::onPeelAllCancelClicked() {
     // Polled by PeelingService between slices (see cancelCb in
     // onPeelAllFiles); takes effect at the next slice boundary.
     m_peelCancelRequested = true;
@@ -801,9 +836,9 @@ void MainWindow::onPeelAllCancelClicked()
 // Help
 // =============================================================================
 
-void MainWindow::onShowManual()
-{
-    QMessageBox::information(this, "User Guide",
+void MainWindow::onShowManual() {
+    QMessageBox::information(
+        this, "User Guide",
         "SKINPEELER 2.0\n\n"
         "1. Open DICOM files — load a folder of .dcm slice files.\n"
         "2. Choose Peeling Mode:\n"
@@ -816,16 +851,14 @@ void MainWindow::onShowManual()
         "7. Use Peeling Region to view specific body halves.\n"
         "8. Save Changes — export peeled slices as DICOM.\n"
         "9. Export Statistics — save per-slice statistics to .txt.\n\n"
-        "Keyboard: Left/Right arrow — navigate slices."
-    );
+        "Keyboard: Left/Right arrow — navigate slices.");
 }
 
 // =============================================================================
 // Key events
 // =============================================================================
 
-bool MainWindow::eventFilter(QObject* obj, QEvent* event)
-{
+bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
     if (obj == m_ui->graphicsView && event->type() == QEvent::KeyPress) {
         QKeyEvent* ke = static_cast<QKeyEvent*>(event);
         if (ke->key() == Qt::Key_Left || ke->key() == Qt::Key_Right) {
@@ -836,8 +869,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
     return QMainWindow::eventFilter(obj, event);
 }
 
-void MainWindow::keyPressEvent(QKeyEvent* event)
-{
+void MainWindow::keyPressEvent(QKeyEvent* event) {
     if (m_images.empty()) {
         QMainWindow::keyPressEvent(event);
         return;
@@ -856,8 +888,7 @@ void MainWindow::keyPressEvent(QKeyEvent* event)
 // UI helpers
 // =============================================================================
 
-void MainWindow::resetUIState()
-{
+void MainWindow::resetUIState() {
     m_ui->groupbox_PeelingMode->setEnabled(false);
     m_ui->groupBox_PeelingParameters->setEnabled(false);
     m_ui->groupBox_VisualizeOptions->setEnabled(false);
@@ -878,14 +909,13 @@ void MainWindow::resetUIState()
     m_ui->lineEdit_Interval->setText(QString::number(DEFAULT_INTERVAL_SECTIONS));
     m_ui->radioButton_WholeBody->setChecked(true);
 
-    m_vizMode          = VisualizationMode::WholeBody;
-    m_peeled           = false;
+    m_vizMode = VisualizationMode::WholeBody;
+    m_peeled = false;
     m_intervalSections = DEFAULT_INTERVAL_SECTIONS;
-    m_viewInitialized  = false;  // Reset so next load triggers fitInView once
+    m_viewInitialized = false;  // Reset so next load triggers fitInView once
 }
 
-void MainWindow::activateUIAfterLoad()
-{
+void MainWindow::activateUIAfterLoad() {
     m_ui->groupbox_PeelingMode->setEnabled(true);
     m_ui->groupBox_PeelingParameters->setEnabled(true);
     m_ui->groupBox_VisualizeOptions->setEnabled(true);
@@ -897,9 +927,9 @@ void MainWindow::activateUIAfterLoad()
     m_ui->checkBox_ShowSkin->setChecked(true);  // Show Skin on by default after load
 }
 
-void MainWindow::updateImageIndexUI()
-{
-    if (m_images.empty()) return;
+void MainWindow::updateImageIndexUI() {
+    if (m_images.empty())
+        return;
 
     m_ui->lineEdit_CurrSection->setText(QString::number(m_currentIndex + 1));
 
@@ -909,27 +939,26 @@ void MainWindow::updateImageIndexUI()
     m_ui->label_CurrentDir->setText("Current Dir : " + fi.absolutePath());
 }
 
-void MainWindow::updateStatsBrowser()
-{
+void MainWindow::updateStatsBrowser() {
     auto stats = StatisticsService::collect(m_images);
     QString report = QString::fromStdString(StatisticsService::formatFullReport(stats));
     m_ui->groupBox_Statistics->setEnabled(true);
     m_ui->plainTextEdit_Statistics->setPlainText(report);
 }
 
-void MainWindow::applySkinColorToButton()
-{
+void MainWindow::applySkinColorToButton() {
     m_ui->pushButton_SkinColor->setStyleSheet(
         QString("QPushButton { background-color: %1; }").arg(m_skinColor.name()));
 }
 
-void MainWindow::syncThicknessSpinbox(const CTImage* img)
-{
-    if (!img || !img->hasShells()) return;
+void MainWindow::syncThicknessSpinbox(const CTImage* img) {
+    if (!img || !img->hasShells())
+        return;
     // peelIndex is 0-based m_shells index.
     // Spinbox shows s-label number = ShellIndex::toLabel(peelIndex).
     int display = ShellIndex::toLabel(img->peelIndex());
-    if (display < 1) display = 1;
+    if (display < 1)
+        display = 1;
     // Block the valueChanged signal so setValue() does not trigger
     // onSkinThicknessEdited() — peelIndex is already correct.
     m_ui->doubleSpinBox_SkinThickness->blockSignals(true);
@@ -941,10 +970,10 @@ void MainWindow::syncThicknessSpinbox(const CTImage* img)
 // Drawing
 // =============================================================================
 
-void MainWindow::drawCurrentCT()
-{
+void MainWindow::drawCurrentCT() {
     CTImage* img = currentImage();
-    if (!img) return;
+    if (!img)
+        return;
     m_scene->displayCTImage(*img);
     // fitInView only on the very first display after loading.
     // Subsequent slice navigation and peel preserve the current zoom/pan state.
@@ -954,38 +983,34 @@ void MainWindow::drawCurrentCT()
     }
 }
 
-void MainWindow::drawShellOverlays()
-{
+void MainWindow::drawShellOverlays() {
     m_scene->clearShellOverlays();
-    if (!m_ui->checkBox_ShowSkin->isChecked()) return;
+    if (!m_ui->checkBox_ShowSkin->isChecked())
+        return;
 
     CTImage* img = currentImage();
-    if (!img || !img->hasShells()) return;
+    if (!img || !img->hasShells())
+        return;
 
     int maxShell = std::min(img->peelIndex(), static_cast<int>(img->shells().size()) - 1);
-    if (maxShell < 0) return;
+    if (maxShell < 0)
+        return;
 
-    m_scene->setShellOverlay(
-        img->shells(),
-        maxShell,
-        m_skinColor,
-        currentPeelRegion());
+    m_scene->setShellOverlay(img->shells(), maxShell, m_skinColor, currentPeelRegion());
 }
 
 // =============================================================================
 // Internal helpers
 // =============================================================================
 
-CTImage* MainWindow::currentImage()
-{
-    if (m_images.empty() || m_currentIndex < 0
-        || m_currentIndex >= static_cast<int>(m_images.size()))
+CTImage* MainWindow::currentImage() {
+    if (m_images.empty() || m_currentIndex < 0 ||
+        m_currentIndex >= static_cast<int>(m_images.size()))
         return nullptr;
     return m_images[m_currentIndex].get();
 }
 
-double MainWindow::currentBeta() const
-{
+double MainWindow::currentBeta() const {
     return m_ui->doubleSpinBox_DetectionProbe->value();
 }
 
@@ -998,8 +1023,7 @@ double MainWindow::currentBeta() const
 // engine is not thread-safe and may hold process-wide state.
 void MainWindow::runEngineTask(
     std::function<void()> work,
-    std::function<void(bool success, const std::string& errMsg)> onDone)
-{
+    std::function<void(bool success, const std::string& errMsg)> onDone) {
     if (m_calcRunning) {
         // Should never happen if call sites check m_calcRunning first
         // (they do); fail safe rather than racing two engine calls.
@@ -1019,7 +1043,8 @@ void MainWindow::runEngineTask(
             errMsg = "Unknown error during background engine operation";
         }
 
-        QMetaObject::invokeMethod(this,
+        QMetaObject::invokeMethod(
+            this,
             [this, onDone = std::move(onDone), ok, errMsg]() mutable {
                 // Reset BEFORE onDone() so that onDone() (or anything it
                 // triggers, e.g. a chained navigation) can start a new task.
@@ -1039,12 +1064,15 @@ void MainWindow::runEngineTask(
     }).detach();
 }
 
-PeelRegion MainWindow::currentPeelRegion() const
-{
-    if (m_ui->radioButton_UpperHalf->isChecked()) return PeelRegion::UpperHalf;
-    if (m_ui->radioButton_LowerHalf->isChecked()) return PeelRegion::LowerHalf;
-    if (m_ui->radioButton_LeftHalf->isChecked())  return PeelRegion::LeftHalf;
-    if (m_ui->radioButton_RightHalf->isChecked()) return PeelRegion::RightHalf;
+PeelRegion MainWindow::currentPeelRegion() const {
+    if (m_ui->radioButton_UpperHalf->isChecked())
+        return PeelRegion::UpperHalf;
+    if (m_ui->radioButton_LowerHalf->isChecked())
+        return PeelRegion::LowerHalf;
+    if (m_ui->radioButton_LeftHalf->isChecked())
+        return PeelRegion::LeftHalf;
+    if (m_ui->radioButton_RightHalf->isChecked())
+        return PeelRegion::RightHalf;
     return PeelRegion::WholeBody;
 }
 
@@ -1052,55 +1080,64 @@ PeelRegion MainWindow::currentPeelRegion() const
 // Annotation (expert segmentation)
 // =============================================================================
 
-void MainWindow::onAnnotationToggle(bool checked)
-{
+void MainWindow::onAnnotationToggle(bool checked) {
     // Defensive — see runEngineTask()'s concurrency contract in MainWindow.h.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     m_ui->graphicsView->setAnnotationMode(checked);
     if (checked) {
         m_ui->graphicsView->setCursor(Qt::CrossCursor);
         m_scene->initAnnotation();
-        statusBar()->showMessage("Annotation mode: click/drag to paint skin pixels. Right-click to pan.");
+        statusBar()->showMessage(
+            "Annotation mode: click/drag to paint skin pixels. Right-click to pan.");
     } else {
         m_ui->graphicsView->setCursor(Qt::ArrowCursor);
         statusBar()->clearMessage();
     }
 }
 
-void MainWindow::onAnnotationPaint(QPointF scenePos)
-{
+void MainWindow::onAnnotationPaint(QPointF scenePos) {
     // Defensive — see runEngineTask()'s concurrency contract in MainWindow.h.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     int col = static_cast<int>(scenePos.x());
     int row = static_cast<int>(scenePos.y());
     m_scene->toggleAnnotation(col, row);
 }
 
-void MainWindow::onAnnotationClear()
-{
+void MainWindow::onAnnotationClear() {
     // Defensive — see runEngineTask()'s concurrency contract in MainWindow.h.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     m_scene->clearAnnotation();
     // Redisplay current CT to remove overlay
     CTImage* img = currentImage();
-    if (img) m_scene->displayCTImage(*img);
+    if (img)
+        m_scene->displayCTImage(*img);
     statusBar()->showMessage("Annotation cleared.", 2000);
 }
 
-void MainWindow::onAnnotationExport()
-{
+void MainWindow::onAnnotationExport() {
     // Defensive — see runEngineTask()'s concurrency contract in MainWindow.h.
-    if (m_calcRunning) return;
+    if (m_calcRunning)
+        return;
 
     CTImage* img = currentImage();
-    if (!img) { QMessageBox::warning(this, "Export", "No image loaded."); return; }
-    if (!m_scene->hasAnnotation()) { QMessageBox::warning(this, "Export", "No annotation to export."); return; }
+    if (!img) {
+        QMessageBox::warning(this, "Export", "No image loaded.");
+        return;
+    }
+    if (!m_scene->hasAnnotation()) {
+        QMessageBox::warning(this, "Export", "No annotation to export.");
+        return;
+    }
 
     QString dir = QFileDialog::getExistingDirectory(this, "Select export folder");
-    if (dir.isEmpty()) return;
+    if (dir.isEmpty())
+        return;
 
     // Build filename from slice info
     QString baseName = QFileInfo(QString::fromStdString(img->filepath())).completeBaseName();
@@ -1116,5 +1153,5 @@ void MainWindow::onAnnotationExport()
     mask.save(maskPath, "PNG");
 
     QMessageBox::information(this, "Export Complete",
-        QString("Saved:\n%1\n%2").arg(annPath, maskPath));
+                             QString("Saved:\n%1\n%2").arg(annPath, maskPath));
 }

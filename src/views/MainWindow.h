@@ -17,7 +17,9 @@
 #include "views/PlotWindow.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
+namespace Ui {
+class MainWindow;
+}
 QT_END_NAMESPACE
 
 class SkinPeelerScene;
@@ -54,9 +56,9 @@ private slots:
     void onIntervalChanged();
 
     // Peeling parameters
-    void onDetectionProbeChanged(double value);   // beta spinbox -> immediate recalc
-    void onAnalysis();                            // Analysis button -> auto-detect thickness
-    void onSkinThicknessEdited(double value);     // thickness spinbox manual edit -> overlay update
+    void onDetectionProbeChanged(double value);  // beta spinbox -> immediate recalc
+    void onAnalysis();                           // Analysis button -> auto-detect thickness
+    void onSkinThicknessEdited(double value);    // thickness spinbox manual edit -> overlay update
 
     // Visualization
     void onVisualizeWholeBody();
@@ -102,13 +104,13 @@ private:
     void drawShellOverlays();
 
     // Internal helpers
-    CTImage*   currentImage();
-    double     currentBeta() const;
-    void       navigateToImage(int index);
-    void       startSliceShellCalc(int index);
+    CTImage* currentImage();
+    double currentBeta() const;
+    void navigateToImage(int index);
+    void startSliceShellCalc(int index);
     PeelRegion currentPeelRegion() const;
-    void       continueAnalysis(CTImage* img);
-    void       setUIEnabled(bool enabled);
+    void continueAnalysis(CTImage* img);
+    void setUIEnabled(bool enabled);
 
     // -------------------------------------------------------------------------
     // runEngineTask — shared background-task runner.
@@ -136,23 +138,23 @@ private:
     // `onDone` returns, if a navigation request was queued while busy
     // (m_pendingNavIndex >= 0), it is replayed via navigateToImage().
     void runEngineTask(std::function<void()> work,
-                        std::function<void(bool success, const std::string& errMsg)> onDone);
+                       std::function<void(bool success, const std::string& errMsg)> onDone);
 
     // Members
-    Ui::MainWindow*  m_ui    = nullptr;
+    Ui::MainWindow* m_ui = nullptr;
     SkinPeelerScene* m_scene = nullptr;
 
     std::vector<std::unique_ptr<CTImage>> m_images;
-    int  m_currentIndex      = 0;
-    int  m_intervalSections  = 5;
-    bool m_peeled            = false;
-    bool m_viewInitialized   = false;   // true after first fitInView
+    int m_currentIndex = 0;
+    int m_intervalSections = 5;
+    bool m_peeled = false;
+    bool m_viewInitialized = false;  // true after first fitInView
 
-    VisualizationMode m_vizMode   = VisualizationMode::WholeBody;
-    QColor            m_skinColor = QColor(255, 255, 0);  // yellow
+    VisualizationMode m_vizMode = VisualizationMode::WholeBody;
+    QColor m_skinColor = QColor(255, 255, 0);  // yellow
 
-    QProgressBar*        m_progressBar = nullptr;
-    std::atomic<bool>    m_calcRunning{false};
+    QProgressBar* m_progressBar = nullptr;
+    std::atomic<bool> m_calcRunning{false};
 
     // Latest slice index requested by navigateToImage() while m_calcRunning
     // was true; -1 = no pending request. Replayed by runEngineTask() once
@@ -162,11 +164,11 @@ private:
 
     // Peel All — cancel button + request flag (polled by PeelingService
     // between slices; cancellation takes effect at the next slice boundary).
-    QPushButton*      m_btnCancelPeel = nullptr;
+    QPushButton* m_btnCancelPeel = nullptr;
     std::atomic<bool> m_peelCancelRequested{false};
 
     // Annotation UI (created programmatically, not in .ui)
-    QPushButton* m_btnAnnotate   = nullptr;
-    QPushButton* m_btnAnnClear   = nullptr;
-    QPushButton* m_btnAnnExport  = nullptr;
+    QPushButton* m_btnAnnotate = nullptr;
+    QPushButton* m_btnAnnClear = nullptr;
+    QPushButton* m_btnAnnExport = nullptr;
 };

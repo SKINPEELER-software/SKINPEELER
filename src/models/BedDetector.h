@@ -33,12 +33,12 @@ public:
     // ImageProcessingBC::ComponentInfo.
     // -------------------------------------------------------------------------
     struct VDComponentInfo {
-        int    id;
+        int id;
         double centroid_x;
         double centroid_y;
         double area;
         double circularity;
-        double score;          // area * circularity^2
+        double score;  // area * circularity^2
     };
 
     // -------------------------------------------------------------------------
@@ -51,18 +51,18 @@ public:
     // Fields that are not computed (early-exit before that stage) are set to -1.0.
     // -------------------------------------------------------------------------
     struct DebugRecord {
-        int         component_id  = -1;
-        double      area          = -1.0;
-        double      circularity   = -1.0;
-        double      centroid_y    = -1.0;  // Voronoi coordinate
-        double      centroid_x    = -1.0;  // Voronoi coordinate
-        double      score         = -1.0;
-        double      width_px      = -1.0;  // computed after (a)(b) pass; -1 if not reached
-        double      max_curvature = -1.0;  // computed after (c) pass; -1 if not reached
-        double      sag_pixels    = -1.0;  // computed in (e); -1 if not reached
-        double      thickness_px  = -1.0;  // avg(bottom_y - top_y); computed after (e); -1 if not reached
-        bool        below_chord_ok = false;
-        std::string fail_reason;           // "pos"/"circ"/"width"/"curv"/"convex"/"thick_low"/"passed"
+        int component_id = -1;
+        double area = -1.0;
+        double circularity = -1.0;
+        double centroid_y = -1.0;  // Voronoi coordinate
+        double centroid_x = -1.0;  // Voronoi coordinate
+        double score = -1.0;
+        double width_px = -1.0;       // computed after (a)(b) pass; -1 if not reached
+        double max_curvature = -1.0;  // computed after (c) pass; -1 if not reached
+        double sag_pixels = -1.0;     // computed in (e); -1 if not reached
+        double thickness_px = -1.0;  // avg(bottom_y - top_y); computed after (e); -1 if not reached
+        bool below_chord_ok = false;
+        std::string fail_reason;  // "pos"/"circ"/"width"/"curv"/"convex"/"thick_low"/"passed"
     };
 
     // -------------------------------------------------------------------------
@@ -70,19 +70,20 @@ public:
     // Stores IDs and scalar values only. No raw pointers.
     // -------------------------------------------------------------------------
     struct BedCandidate {
-        int    component_id;
+        int component_id;
         double centroid_x;
         double centroid_y;
         double area;
         double circularity;
-        std::vector<int> top_boundary_rows;    // min row per col (pixel-space)
-        std::vector<int> top_boundary_cols;    // col indices with valid pixels
-        std::vector<int> bottom_boundary_rows; // max row per col (pixel-space); parallel to top_boundary_cols
-        double width_px = 0.0;                 // bounding box width
-        std::vector<double> poly_coeffs;       // polynomial coefficients [a0, a1, ..., ad]
-        double max_curvature = 0.0;            // max absolute curvature of fitted poly
-        double sag_pixels    = 0.0;            // center_avg_y - edge_avg_y (>0 = downward sag)
-        bool   below_chord_ok = false;         // all top_boundary pts below chord line
+        std::vector<int> top_boundary_rows;  // min row per col (pixel-space)
+        std::vector<int> top_boundary_cols;  // col indices with valid pixels
+        std::vector<int>
+            bottom_boundary_rows;  // max row per col (pixel-space); parallel to top_boundary_cols
+        double width_px = 0.0;     // bounding box width
+        std::vector<double> poly_coeffs;  // polynomial coefficients [a0, a1, ..., ad]
+        double max_curvature = 0.0;       // max absolute curvature of fitted poly
+        double sag_pixels = 0.0;          // center_avg_y - edge_avg_y (>0 = downward sag)
+        bool below_chord_ok = false;      // all top_boundary pts below chord line
     };
 
     // -------------------------------------------------------------------------
@@ -95,8 +96,10 @@ public:
     // -------------------------------------------------------------------------
     struct LowerEnvelope {
         int width = 0;
-        std::vector<int> y_at_col;           // size = width; -1 = no bed at this col (top y, column-wise minimum)
-        std::vector<int> bottom_y_at_col;    // size = width; -1 = no bed at this col (bottom y, column-wise maximum)
+        std::vector<int>
+            y_at_col;  // size = width; -1 = no bed at this col (top y, column-wise minimum)
+        std::vector<int> bottom_y_at_col;  // size = width; -1 = no bed at this col (bottom y,
+                                           // column-wise maximum)
         bool valid = false;
     };
 
@@ -104,34 +107,34 @@ public:
     // Params
     // -------------------------------------------------------------------------
     struct Params {
-        double theta_curv         = 0.003;  // max curvature [1/px] (radius ~333px)
-        double min_sag_pixels     = 1.5;    // sag check minimum (downward sag >= N px)
+        double theta_curv = 0.003;    // max curvature [1/px] (radius ~333px)
+        double min_sag_pixels = 1.5;  // sag check minimum (downward sag >= N px)
         // min_sag_pixels rationale: CT bed top boundary observed sag = 1.89~3.30 px
         // (5 slices, MM20). bed is a flat plate, not arched. 5.0 was too strict.
         // False-positive defense for spine/vertebrae is already provided by
         // (b) circularity <= 0.3 (spine is near-circular, circ > 0.3 => rejected).
-        double chord_tolerance_px = 1.0;    // below-chord check allowance [px]
-        double theta_pos          = 50.0;   // bed centroid_y (pixel row) >
-                                            // body0_cy_px + theta_pos. Cloth false-positive
-                                            // exclusion: cloth lies 5~30 px below body0,
-                                            // real bed lies 96+ px below body0 (MM20 obs).
-        double theta_size         = 0.4;    // min width ratio (fraction of image width)
-        double theta_circularity  = 0.3;    // max circularity (bed has low circularity)
-        double min_thickness_px   = 0.0;    // Disabled by default: the BFS row-scan
-                                            // measurement underestimates true bed thickness
-                                            // (30+ px bed measured as 5-6 px), making the
-                                            // threshold unreliable. The condition itself
-                                            // remains available for future use.
-        double top_clamp_ratio    = 0.4;    // Envelope top_y row clamp ratio: any column
-                                            // with envelope.y_at_col[col] < image_height *
-                                            // top_clamp_ratio is clamped to that row. Prevents
-                                            // a cloth+bed merged component's envelope from
-                                            // reaching into the body region (top 40% of the
-                                            // image) and producing a false mask.
-        int    n_layers_max       = 3;      // max bed layers
-        int    n_layers_min       = 1;      // min bed layers required
-        int    poly_degree        = 2;      // polynomial degree for curvature estimation
-        int    min_boundary_pts   = 10;     // minimum top-boundary points for poly fit
+        double chord_tolerance_px = 1.0;  // below-chord check allowance [px]
+        double theta_pos = 50.0;          // bed centroid_y (pixel row) >
+                                          // body0_cy_px + theta_pos. Cloth false-positive
+                                          // exclusion: cloth lies 5~30 px below body0,
+                                          // real bed lies 96+ px below body0 (MM20 obs).
+        double theta_size = 0.4;          // min width ratio (fraction of image width)
+        double theta_circularity = 0.3;   // max circularity (bed has low circularity)
+        double min_thickness_px = 0.0;    // Disabled by default: the BFS row-scan
+                                          // measurement underestimates true bed thickness
+                                          // (30+ px bed measured as 5-6 px), making the
+                                          // threshold unreliable. The condition itself
+                                          // remains available for future use.
+        double top_clamp_ratio = 0.4;     // Envelope top_y row clamp ratio: any column
+                                          // with envelope.y_at_col[col] < image_height *
+                                          // top_clamp_ratio is clamped to that row. Prevents
+                                          // a cloth+bed merged component's envelope from
+                                          // reaching into the body region (top 40% of the
+                                          // image) and producing a false mask.
+        int n_layers_max = 3;             // max bed layers
+        int n_layers_min = 1;             // min bed layers required
+        int poly_degree = 2;              // polynomial degree for curvature estimation
+        int min_boundary_pts = 10;        // minimum top-boundary points for poly fit
     };
 
     // -------------------------------------------------------------------------
@@ -139,16 +142,16 @@ public:
     // -------------------------------------------------------------------------
     struct Result {
         std::vector<BedCandidate> bed_candidates;
-        LowerEnvelope             envelope;
-        bool                      detected = false;
-        int                       n_layers = 0;
-        int                       new_body0_component_id = -1;
+        LowerEnvelope envelope;
+        bool detected = false;
+        int n_layers = 0;
+        int new_body0_component_id = -1;
         // -1: no body0 replacement needed
         // >=0: id of component to use as new body0
 
         // Debug: one record per VD component, populated during detect().
         // Not stored in BedCache (debug_records is always empty after cache hit).
-        std::vector<DebugRecord>  debug_records;
+        std::vector<DebugRecord> debug_records;
     };
 
     // -------------------------------------------------------------------------
@@ -170,9 +173,8 @@ public:
     //   3. If current body0 (vd_components[0]) is in bed_candidates:
     //      find non-bed component with max score => new_body0_component_id
     //   4. If no bed candidates: detected=false, new_body0_component_id=-1
-    Result detect(const std::vector<VDComponentInfo>& vd_components,
-                  const uint16_t* image, int width, int height,
-                  double body0_cy, const Params& params);
+    Result detect(const std::vector<VDComponentInfo>& vd_components, const uint16_t* image,
+                  int width, int height, double body0_cy, const Params& params);
 
     // -------------------------------------------------------------------------
     // Helpers (public for unit-testability)
@@ -182,28 +184,26 @@ public:
     // where y = a0 + a1*x + a2*x^2 + ... Evaluated at normalised x.
     // Returns empty vector if fit fails (singular matrix, insufficient points).
     static std::vector<double> fitPolynomial(const std::vector<double>& x,
-                                             const std::vector<double>& y,
-                                             int degree);
+                                             const std::vector<double>& y, int degree);
 
     // Max absolute curvature of polynomial over x range [x0, x1].
     // Samples n_samples points and returns max |kappa| = |y''| / (1 + y'^2)^1.5
-    static double maxCurvature(const std::vector<double>& coeffs,
-                               double x0, double x1, int n_samples = 50);
+    static double maxCurvature(const std::vector<double>& coeffs, double x0, double x1,
+                               int n_samples = 50);
 
     // Check sag and below-chord conditions on top-boundary.
     // Fills candidate.sag_pixels and candidate.below_chord_ok.
     // Returns true if both conditions pass.
-    static bool checkSagAndChord(BedCandidate& candidate,
-                                 double min_sag_pixels,
+    static bool checkSagAndChord(BedCandidate& candidate, double min_sag_pixels,
                                  double chord_tolerance_px);
 
 private:
     // Extract top and bottom boundary (min/max row per column) for a VD component region.
     // Fills candidate.top_boundary_rows, top_boundary_cols, bottom_boundary_rows.
-    // Scan range: rows from max(0, centroid_row - scan_margin) to min(height-1, centroid_row + scan_margin).
-    // scan_margin = sqrt(area / pi) * 1.5 (approximate radius from VD area).
-    void extractTopBoundary(const uint16_t* image, int width, int height,
-                            const VDComponentInfo& vd, BedCandidate& candidate);
+    // Scan range: rows from max(0, centroid_row - scan_margin) to min(height-1, centroid_row +
+    // scan_margin). scan_margin = sqrt(area / pi) * 1.5 (approximate radius from VD area).
+    void extractTopBoundary(const uint16_t* image, int width, int height, const VDComponentInfo& vd,
+                            BedCandidate& candidate);
 
     // Check if a VD component qualifies as bed.
     // Six conditions (AND):
@@ -216,10 +216,7 @@ private:
     // Fills candidate_out with computed metrics.
     // Fills debug_out with per-condition inspection result (fail_reason, metrics).
     // Returns true if all conditions pass.
-    bool isBedCandidate(const VDComponentInfo& vd, double body0_cy,
-                        int image_width, int image_height,
-                        const uint16_t* image,
-                        const Params& params,
-                        BedCandidate& candidate_out,
-                        DebugRecord& debug_out);
+    bool isBedCandidate(const VDComponentInfo& vd, double body0_cy, int image_width,
+                        int image_height, const uint16_t* image, const Params& params,
+                        BedCandidate& candidate_out, DebugRecord& debug_out);
 };

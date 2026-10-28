@@ -11,14 +11,12 @@ class QPushButton;
 class PlotWindow : public QDialog {
     Q_OBJECT
 public:
-    explicit PlotWindow(PlotWidget* plotWidget,
-                        const QString& title,
-                        QWidget* parent = nullptr);
+    explicit PlotWindow(PlotWidget* plotWidget, const QString& title, QWidget* parent = nullptr);
 
 private slots:
     void onSave();
 
 private:
-    PlotWidget*  m_plot = nullptr;
+    PlotWidget* m_plot = nullptr;
     QPushButton* m_saveBtn = nullptr;
 };

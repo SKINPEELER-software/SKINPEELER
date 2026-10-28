@@ -4,10 +4,10 @@
 
 namespace ShellStatistics {
 
-bool invert2x2(const double cov[2][2], double inv[2][2])
-{
+bool invert2x2(const double cov[2][2], double inv[2][2]) {
     double det = cov[0][0] * cov[1][1] - cov[0][1] * cov[1][0];
-    if (std::abs(det) < 1e-10) return false;
+    if (std::abs(det) < 1e-10)
+        return false;
     inv[0][0] = cov[1][1] / det;
     inv[0][1] = -cov[0][1] / det;
     inv[1][0] = -cov[1][0] / det;
@@ -15,16 +15,15 @@ bool invert2x2(const double cov[2][2], double inv[2][2])
     return true;
 }
 
-double mahalanobis2D(const double diff[2], const double inv[2][2])
-{
+double mahalanobis2D(const double diff[2], const double inv[2][2]) {
     double t0 = inv[0][0] * diff[0] + inv[0][1] * diff[1];
     double t1 = inv[1][0] * diff[0] + inv[1][1] * diff[1];
     return std::sqrt(diff[0] * t0 + diff[1] * t1);
 }
 
-int cuttingEuclideanDistance(const std::vector<std::pair<double, double>>& points, int offset)
-{
-    if (points.empty()) return 0;
+int cuttingEuclideanDistance(const std::vector<std::pair<double, double>>& points, int offset) {
+    if (points.empty())
+        return 0;
 
     double maxDist = -1.0;
     int maxIndex = 0;
@@ -43,9 +42,9 @@ int cuttingEuclideanDistance(const std::vector<std::pair<double, double>>& point
 }
 
 int findDistanceJump(const std::vector<std::pair<double, double>>& points, int offset,
-                      double distanceJumpSigma)
-{
-    if (points.size() < 2) return 0;
+                     double distanceJumpSigma) {
+    if (points.size() < 2)
+        return 0;
 
     std::vector<double> dists;
     for (int i = 0; i + 1 < static_cast<int>(points.size()); ++i) {
@@ -55,28 +54,31 @@ int findDistanceJump(const std::vector<std::pair<double, double>>& points, int o
     }
 
     double dmean = 0;
-    for (double d : dists) dmean += d;
+    for (double d : dists)
+        dmean += d;
     dmean /= static_cast<double>(dists.size());
 
     double dvar = 0;
-    for (double d : dists) dvar += (d - dmean) * (d - dmean);
+    for (double d : dists)
+        dvar += (d - dmean) * (d - dmean);
     double dstd = std::sqrt(dvar / static_cast<double>(dists.size()));
 
     double threshold = dmean + distanceJumpSigma * dstd;
 
     for (int i = 0; i < static_cast<int>(dists.size()); ++i) {
-        if (dists[i] > threshold) return i + offset;
+        if (dists[i] > threshold)
+            return i + offset;
     }
     return offset;
 }
 
 SigmaCuttingResult cutting3SigmaDistance(const std::vector<std::pair<double, double>>& points,
-                                          int offset, double sigmaThreshold,
-                                          double distanceJumpSigma)
-{
+                                         int offset, double sigmaThreshold,
+                                         double distanceJumpSigma) {
     SigmaCuttingResult result;
 
-    if (static_cast<int>(points.size()) < 4) return result;  // computed == false
+    if (static_cast<int>(points.size()) < 4)
+        return result;  // computed == false
 
     const double np = static_cast<double>(points.size());
     double meanMu = 0, meanSigma = 0;
@@ -99,7 +101,8 @@ SigmaCuttingResult cutting3SigmaDistance(const std::vector<std::pair<double, dou
     double cov[2][2] = {{c00 / div, c01 / div}, {c01 / div, c11 / div}};
     double inv[2][2];
 
-    if (!invert2x2(cov, inv)) return result;  // computed == false
+    if (!invert2x2(cov, inv))
+        return result;  // computed == false
 
     result.computed = true;
     result.mahalDistances.resize(points.size());
@@ -114,8 +117,8 @@ SigmaCuttingResult cutting3SigmaDistance(const std::vector<std::pair<double, dou
 
     for (int i = 0; i < static_cast<int>(result.inside.size()); ++i) {
         if (result.inside[i]) {
-            result.cuttingIndex = (i == 0) ? findDistanceJump(points, offset, distanceJumpSigma)
-                                            : (i - 1) + offset;
+            result.cuttingIndex =
+                (i == 0) ? findDistanceJump(points, offset, distanceJumpSigma) : (i - 1) + offset;
             return result;
         }
     }

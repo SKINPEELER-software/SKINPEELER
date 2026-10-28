@@ -6,13 +6,10 @@
 // =============================================================================
 // Auto mode
 // =============================================================================
-void PeelingService::peelAutoMode(
-    std::vector<std::unique_ptr<CTImage>>& images,
-    int thicknessIncrement,
-    PeelRegion region,
-    const ProgressCallback& onProgress,
-    const CancelCallback& isCancelled)
-{
+void PeelingService::peelAutoMode(std::vector<std::unique_ptr<CTImage>>& images,
+                                  int thicknessIncrement, PeelRegion region,
+                                  const ProgressCallback& onProgress,
+                                  const CancelCallback& isCancelled) {
     const int total = static_cast<int>(images.size());
     for (int i = 0; i < total; ++i) {
         if (isCancelled && isCancelled())
@@ -32,23 +29,21 @@ void PeelingService::peelAutoMode(
                          img->filepath().c_str(), e.what());
         }
 
-        if (onProgress) onProgress(i + 1, total);
+        if (onProgress)
+            onProgress(i + 1, total);
     }
 }
 
 // =============================================================================
 // Uniform mode
 // =============================================================================
-void PeelingService::peelUniformMode(
-    std::vector<std::unique_ptr<CTImage>>& images,
-    const std::vector<int>& sections,
-    const std::vector<int>& sectionThicknesses,
-    PeelRegion region,
-    const ProgressCallback& onProgress,
-    const CancelCallback& isCancelled)
-{
-    auto thicknessList = interpolateThickness(
-        static_cast<int>(images.size()), sections, sectionThicknesses);
+void PeelingService::peelUniformMode(std::vector<std::unique_ptr<CTImage>>& images,
+                                     const std::vector<int>& sections,
+                                     const std::vector<int>& sectionThicknesses, PeelRegion region,
+                                     const ProgressCallback& onProgress,
+                                     const CancelCallback& isCancelled) {
+    auto thicknessList =
+        interpolateThickness(static_cast<int>(images.size()), sections, sectionThicknesses);
 
     const int total = static_cast<int>(images.size());
     for (int i = 0; i < total; ++i) {
@@ -72,20 +67,20 @@ void PeelingService::peelUniformMode(
                          img->filepath().c_str(), e.what());
         }
 
-        if (onProgress) onProgress(i + 1, total);
+        if (onProgress)
+            onProgress(i + 1, total);
     }
 }
 
 // =============================================================================
 // Half-peel auto mode
 // =============================================================================
-void PeelingService::halfPeelAutoMode(
-    std::vector<std::unique_ptr<CTImage>>& images,
-    int thicknessIncrement)
-{
+void PeelingService::halfPeelAutoMode(std::vector<std::unique_ptr<CTImage>>& images,
+                                      int thicknessIncrement) {
     for (auto& img : images) {
         try {
-            if (!img->hasShells()) img->calculateShells();
+            if (!img->hasShells())
+                img->calculateShells();
         } catch (const std::exception& e) {
             std::fprintf(stderr, "PeelingService::halfPeelAutoMode: skipping slice \"%s\": %s\n",
                          img->filepath().c_str(), e.what());
@@ -100,8 +95,7 @@ void PeelingService::halfPeelAutoMode(
 // =============================================================================
 // computeSectionIndices — evenly spaced key-slice indices
 // =============================================================================
-std::vector<int> PeelingService::computeSectionIndices(int totalImages, int numSections)
-{
+std::vector<int> PeelingService::computeSectionIndices(int totalImages, int numSections) {
     numSections = std::min(numSections, totalImages);
     std::vector<int> indices;
     indices.reserve(numSections);
@@ -117,11 +111,9 @@ std::vector<int> PeelingService::computeSectionIndices(int totalImages, int numS
 // interpolateThickness — linear interpolation between key sections
 // Matches Python bisect-based implementation in skinPeeler.py
 // =============================================================================
-std::vector<double> PeelingService::interpolateThickness(
-    int totalImages,
-    const std::vector<int>& sections,
-    const std::vector<int>& thicknesses)
-{
+std::vector<double> PeelingService::interpolateThickness(int totalImages,
+                                                         const std::vector<int>& sections,
+                                                         const std::vector<int>& thicknesses) {
     std::vector<double> result(totalImages);
 
     for (int i = 0; i < totalImages; ++i) {
@@ -139,9 +131,9 @@ std::vector<double> PeelingService::interpolateThickness(
             int nextI = sections[pos];
             int nextT = thicknesses[pos];
 
-            double t = static_cast<double>(nextT - prevT) /
-                       static_cast<double>(nextI - prevI) *
-                       static_cast<double>(i - prevI) + prevT;
+            double t = static_cast<double>(nextT - prevT) / static_cast<double>(nextI - prevI) *
+                           static_cast<double>(i - prevI) +
+                       prevT;
             result[i] = t;
         }
     }

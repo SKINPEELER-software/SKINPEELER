@@ -29,79 +29,129 @@ public:
     // -------------------------------------------------------------------------
     // Exceptions
     // -------------------------------------------------------------------------
-    struct DicomLoadError   : std::runtime_error { using std::runtime_error::runtime_error; };
-    struct VoronoiError     : std::runtime_error { using std::runtime_error::runtime_error; };
-    struct PeelingError     : std::runtime_error { using std::runtime_error::runtime_error; };
+    struct DicomLoadError : std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
+    struct VoronoiError : std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
+    struct PeelingError : std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
 
     // -------------------------------------------------------------------------
     // Factory
     // -------------------------------------------------------------------------
-    static CTImage fromDicomFile(
-        const std::string& filepath,
-        double beta               = DEFAULT_BETA,
-        int    defaultThickness   = DEFAULT_SHELL_THICKNESS);
+    static CTImage fromDicomFile(const std::string& filepath, double beta = DEFAULT_BETA,
+                                 int defaultThickness = DEFAULT_SHELL_THICKNESS);
 
     // -------------------------------------------------------------------------
     // Constructors / destructor
     // -------------------------------------------------------------------------
-    CTImage(std::unique_ptr<DcmFileFormat> fileFormat,
-            const std::string& filepath,
-            double beta,
-            int    defaultThickness);
+    CTImage(std::unique_ptr<DcmFileFormat> fileFormat, const std::string& filepath, double beta,
+            int defaultThickness);
     ~CTImage();
 
     // Non-copyable, movable
     // Move ops declared here, defined in .cpp where VoronoiImpl is complete
-    CTImage(const CTImage&)            = delete;
+    CTImage(const CTImage&) = delete;
     CTImage& operator=(const CTImage&) = delete;
-    CTImage(CTImage&&)                 noexcept;
-    CTImage& operator=(CTImage&&)      noexcept;
+    CTImage(CTImage&&) noexcept;
+    CTImage& operator=(CTImage&&) noexcept;
 
     // -------------------------------------------------------------------------
     // Properties
     // -------------------------------------------------------------------------
-    const std::string& filepath() const   { return m_filepath; }
-    int width()  const                    { return m_width; }
-    int height() const                    { return m_height; }
+    const std::string& filepath() const {
+        return m_filepath;
+    }
+    int width() const {
+        return m_width;
+    }
+    int height() const {
+        return m_height;
+    }
 
     // Processed display image (uint16, row-major, height x width)
-    const std::vector<uint16_t>& image() const { return m_image; }
+    const std::vector<uint16_t>& image() const {
+        return m_image;
+    }
 
     // Raw DICOM pixels (for export after peeling)
-    const std::vector<uint16_t>& originalImage() const { return m_originalImage; }
+    const std::vector<uint16_t>& originalImage() const {
+        return m_originalImage;
+    }
 
-    double imageMax() const { return m_imageMax; }
-    double sliceLocation() const { return m_sliceLocation; }
+    double imageMax() const {
+        return m_imageMax;
+    }
+    double sliceLocation() const {
+        return m_sliceLocation;
+    }
 
-    const std::vector<CTShell>& shells() const { return m_shells; }
-    std::vector<CTShell>&       shells()       { return m_shells; }
+    const std::vector<CTShell>& shells() const {
+        return m_shells;
+    }
+    std::vector<CTShell>& shells() {
+        return m_shells;
+    }
 
-    int peelIndex() const         { return m_peelIndex; }
-    void setPeelIndex(int idx)    { m_peelIndex = std::max(0, idx); }
+    int peelIndex() const {
+        return m_peelIndex;
+    }
+    void setPeelIndex(int idx) {
+        m_peelIndex = std::max(0, idx);
+    }
 
-    double beta() const           { return m_beta; }
+    double beta() const {
+        return m_beta;
+    }
     void setBeta(double b);
 
-    bool isPeeled()              const { return m_peeled; }
-    bool hasShells()             const { return !m_shells.empty(); }
-    bool doNotChangeThickness()  const { return m_doNotChangeThickness; }
-    bool timedOut()              const { return m_timedOut; }
-    int  algoPeelIndex()         const { return m_algoPeelIndex; }
+    bool isPeeled() const {
+        return m_peeled;
+    }
+    bool hasShells() const {
+        return !m_shells.empty();
+    }
+    bool doNotChangeThickness() const {
+        return m_doNotChangeThickness;
+    }
+    bool timedOut() const {
+        return m_timedOut;
+    }
+    int algoPeelIndex() const {
+        return m_algoPeelIndex;
+    }
 
     // Per-shell Mahalanobis distance and inside/outside from cutting3SigmaDistance().
     // Index 0 = shell[0] (excluded from stats, mahal=-1), index 1+ = shell[1]+.
-    const std::vector<double>& shellMahalD()  const { return m_shellMahalD; }
-    const std::vector<bool>&   shellInside()  const { return m_shellInside; }
+    const std::vector<double>& shellMahalD() const {
+        return m_shellMahalD;
+    }
+    const std::vector<bool>& shellInside() const {
+        return m_shellInside;
+    }
 
     // -------------------------------------------------------------------------
     // Bed removal control
     // Default off — when disabled, calculateShells() behaves exactly as before.
     // -------------------------------------------------------------------------
-    void setBedRemoval(bool enabled)             { m_bedRemovalEnabled = enabled; }
-    bool bedRemovalEnabled() const               { return m_bedRemovalEnabled; }
-    void setSpecimenDir(const std::string& d)    { m_specimenDir = d; }
-    const std::string& specimenDir() const       { return m_specimenDir; }
-    const BedDetector::Result& bedResult() const { return m_bedResult; }
+    void setBedRemoval(bool enabled) {
+        m_bedRemovalEnabled = enabled;
+    }
+    bool bedRemovalEnabled() const {
+        return m_bedRemovalEnabled;
+    }
+    void setSpecimenDir(const std::string& d) {
+        m_specimenDir = d;
+    }
+    const std::string& specimenDir() const {
+        return m_specimenDir;
+    }
+    const BedDetector::Result& bedResult() const {
+        return m_bedResult;
+    }
 
     // -------------------------------------------------------------------------
     // Operations
@@ -178,16 +228,16 @@ public:
     // Mirrors ImageProcessingBC::ComponentInfo (additive, no V headers exposed).
     // -------------------------------------------------------------------------
     struct ComponentScoreInfo {
-        int    id;
+        int id;
         double centroid_x;
         double centroid_y;
         double area;
         double circularity;
-        double score;        // area * circularity^2 (same as biggest-component selection)
-        double perimeter_total   = 0.0;  // Σ all regular boundary edges (outer + inner-hole rims)
+        double score;                  // area * circularity^2 (same as biggest-component selection)
+        double perimeter_total = 0.0;  // Σ all regular boundary edges (outer + inner-hole rims)
         double outer_loop_length = 0.0;  // outer loop only
-        int    n_inner_loops     = 0;
-        int    n_outer_edges     = 0;
+        int n_inner_loops = 0;
+        int n_outer_edges = 0;
     };
 
     // -------------------------------------------------------------------------
@@ -213,21 +263,23 @@ public:
     // Basic statistics used by StatisticsService
     struct Stats {
         std::string filename;
-        int         peelIndex   = 0;
-        int         shellCount  = 0;
-        double      mu          = 0.0;
-        double      sigma       = 0.0;
-        bool        isPeeled    = false;
-        bool        hasStats    = false;
+        int peelIndex = 0;
+        int shellCount = 0;
+        double mu = 0.0;
+        double sigma = 0.0;
+        bool isPeeled = false;
+        bool hasStats = false;
     };
     Stats collectStats() const;
 
     // Access raw DCMTK object for saving
-    DcmFileFormat* dcmFileFormat() const { return m_fileFormat.get(); }
+    DcmFileFormat* dcmFileFormat() const {
+        return m_fileFormat.get();
+    }
 
     // Public: shell statistics for the shell-analysis plot widgets
-    std::vector<std::pair<double,double>>
-        extractShellStatistics(bool excludeOutermost = EXCLUDE_OUTERMOST_SHELL) const;
+    std::vector<std::pair<double, double>> extractShellStatistics(
+        bool excludeOutermost = EXCLUDE_OUTERMOST_SHELL) const;
 
 private:
     // -------------------------------------------------------------------------
@@ -260,41 +312,41 @@ private:
     int calculateCuttingShell(CuttingAlgorithm algo = DEFAULT_CUTTING_ALGORITHM);
     int cuttingEuclideanDistance();
     int cutting3SigmaDistance();
-    int cuttingGmmSequential();   // stub → falls back to Euclidean
+    int cuttingGmmSequential();  // stub → falls back to Euclidean
 
     // -------------------------------------------------------------------------
     // Data members
     // -------------------------------------------------------------------------
     std::unique_ptr<DcmFileFormat> m_fileFormat;
-    std::string  m_filepath;
-    double       m_beta;
-    int          m_defaultThickness;
+    std::string m_filepath;
+    double m_beta;
+    int m_defaultThickness;
 
     std::vector<uint16_t> m_image;          // processed display image
     std::vector<uint16_t> m_originalImage;  // raw DICOM pixels (for export)
-    bool   m_rawDicomReleased = false;      // set true by releaseRawDicom()
-    int    m_width  = 0;
-    int    m_height = 0;
-    double m_imageMax       = 0.0;
-    double m_sliceLocation  = 0.0;
-    uint16_t m_minIntensity = 0;            // min of original, used during peeling
+    bool m_rawDicomReleased = false;        // set true by releaseRawDicom()
+    int m_width = 0;
+    int m_height = 0;
+    double m_imageMax = 0.0;
+    double m_sliceLocation = 0.0;
+    uint16_t m_minIntensity = 0;  // min of original, used during peeling
 
     std::vector<CTShell> m_shells;
-    int  m_peelIndex     = 0;
-    int  m_algoPeelIndex = 0;   // algorithm-computed cut, never modified by user actions
-    bool m_peeled    = false;
-    mutable bool m_doNotChangeThickness = false;    // flag set when shell stats are invalid
+    int m_peelIndex = 0;
+    int m_algoPeelIndex = 0;  // algorithm-computed cut, never modified by user actions
+    bool m_peeled = false;
+    mutable bool m_doNotChangeThickness = false;  // flag set when shell stats are invalid
 
     bool m_timedOut = false;
 
     // Bed removal state (disabled by default — calculateShells() unchanged)
-    bool             m_bedRemovalEnabled = false;
-    std::string      m_specimenDir;        // cache file root (set by SkinpeelerSession)
-    BedDetector::Result m_bedResult;       // per-slice detection result
+    bool m_bedRemovalEnabled = false;
+    std::string m_specimenDir;        // cache file root (set by SkinpeelerSession)
+    BedDetector::Result m_bedResult;  // per-slice detection result
 
     // Filled by cutting3SigmaDistance(). Size = m_shells.size().
-    std::vector<double> m_shellMahalD;   // shell[0]=-1 (excluded), shell[1+]=actual d
-    std::vector<bool>   m_shellInside;   // shell[0]=false, shell[1+]=d<=SIGMA_THRESHOLD
+    std::vector<double> m_shellMahalD;  // shell[0]=-1 (excluded), shell[1+]=actual d
+    std::vector<bool> m_shellInside;    // shell[0]=false, shell[1+]=d<=SIGMA_THRESHOLD
 
     // Voronoi object — released after shell extraction via releaseVoronoi()
     struct VoronoiImpl;

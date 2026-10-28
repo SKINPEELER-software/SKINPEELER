@@ -21,9 +21,9 @@ public:
     struct InterShellStats {
         std::vector<double> distances;  // consecutive euclidean distances
         double mean = 0.0;
-        double max  = 0.0;
-        double min  = 0.0;
-        bool   valid = false;
+        double max = 0.0;
+        double min = 0.0;
+        bool valid = false;
     };
 
     static StatsList collect(const std::vector<std::unique_ptr<CTImage>>& images);
@@ -39,5 +39,5 @@ public:
 
     // Compute Euclidean distances between consecutive (mu, sigma) shell points
     static InterShellStats computeInterShellDistances(
-        const std::vector<std::pair<double,double>>& shellStats);
+        const std::vector<std::pair<double, double>>& shellStats);
 };

@@ -26,18 +26,19 @@ namespace {
 static std::string intVecToJson(const std::vector<int>& v) {
     std::string s = "[";
     for (int i = 0; i < static_cast<int>(v.size()); ++i) {
-        if (i > 0) s += ",";
+        if (i > 0)
+            s += ",";
         s += std::to_string(v[i]);
     }
     s += "]";
     return s;
 }
 
-static std::string intVecToJson(const std::vector<int>& v,
-                                 size_t start, size_t count) {
+static std::string intVecToJson(const std::vector<int>& v, size_t start, size_t count) {
     std::string s = "[";
     for (size_t i = start; i < start + count && i < v.size(); ++i) {
-        if (i > start) s += ",";
+        if (i > start)
+            s += ",";
         s += std::to_string(v[i]);
     }
     s += "]";
@@ -56,9 +57,13 @@ static std::string jsonEscape(const std::string& s) {
     std::string out;
     out.reserve(s.size() + 4);
     for (char c : s) {
-        if (c == '"') { out += "\\\""; }
-        else if (c == '\\') { out += "\\\\"; }
-        else { out += c; }
+        if (c == '"') {
+            out += "\\\"";
+        } else if (c == '\\') {
+            out += "\\\\";
+        } else {
+            out += c;
+        }
     }
     return out;
 }
@@ -68,7 +73,8 @@ static std::string jsonEscape(const std::string& s) {
 // Trim whitespace from both ends
 static std::string trim(const std::string& s) {
     size_t a = s.find_first_not_of(" \t\r\n");
-    if (a == std::string::npos) return "";
+    if (a == std::string::npos)
+        return "";
     size_t b = s.find_last_not_of(" \t\r\n");
     return s.substr(a, b - a + 1);
 }
@@ -77,7 +83,7 @@ static std::string trim(const std::string& s) {
 static std::vector<int> parseIntArray(const std::string& s) {
     std::vector<int> result;
     size_t start = s.find('[');
-    size_t end   = s.find(']');
+    size_t end = s.find(']');
     if (start == std::string::npos || end == std::string::npos || end <= start + 1)
         return result;
 
@@ -91,8 +97,8 @@ static std::vector<int> parseIntArray(const std::string& s) {
                 result.push_back(std::stoi(token));
             } catch (...) {
                 std::fprintf(stderr,
-                    "BedCache: skipping malformed integer token in cache file: \"%s\"\n",
-                    token.c_str());
+                             "BedCache: skipping malformed integer token in cache file: \"%s\"\n",
+                             token.c_str());
             }
         }
     }
@@ -100,76 +106,88 @@ static std::vector<int> parseIntArray(const std::string& s) {
 }
 
 // Parse a JSON string value:  "key": "value"  → returns value (unescaped)
-static bool parseStringValue(const std::string& line, const std::string& key,
-                               std::string& out) {
+static bool parseStringValue(const std::string& line, const std::string& key, std::string& out) {
     // Look for "key": "..."
     std::string needle = "\"" + key + "\"";
     size_t pos = line.find(needle);
-    if (pos == std::string::npos) return false;
+    if (pos == std::string::npos)
+        return false;
     size_t colon = line.find(':', pos + needle.size());
-    if (colon == std::string::npos) return false;
+    if (colon == std::string::npos)
+        return false;
     size_t q1 = line.find('"', colon + 1);
-    if (q1 == std::string::npos) return false;
+    if (q1 == std::string::npos)
+        return false;
     size_t q2 = line.find('"', q1 + 1);
-    if (q2 == std::string::npos) return false;
+    if (q2 == std::string::npos)
+        return false;
     out = line.substr(q1 + 1, q2 - q1 - 1);
     return true;
 }
 
 // Parse "key": <number>  → fills out
-static bool parseNumberValue(const std::string& line, const std::string& key,
-                               double& out) {
+static bool parseNumberValue(const std::string& line, const std::string& key, double& out) {
     std::string needle = "\"" + key + "\"";
     size_t pos = line.find(needle);
-    if (pos == std::string::npos) return false;
+    if (pos == std::string::npos)
+        return false;
     size_t colon = line.find(':', pos + needle.size());
-    if (colon == std::string::npos) return false;
+    if (colon == std::string::npos)
+        return false;
     // find first digit, '-', or '.'
     size_t numStart = line.find_first_not_of(" \t", colon + 1);
-    if (numStart == std::string::npos) return false;
+    if (numStart == std::string::npos)
+        return false;
     try {
         size_t consumed = 0;
         out = std::stod(line.substr(numStart), &consumed);
         return consumed > 0;
     } catch (...) {
-        std::fprintf(stderr,
-            "BedCache: skipping malformed number for key \"%s\" in cache file\n",
-            key.c_str());
+        std::fprintf(stderr, "BedCache: skipping malformed number for key \"%s\" in cache file\n",
+                     key.c_str());
         return false;
     }
 }
 
-static bool parseIntValue(const std::string& line, const std::string& key,
-                            int& out) {
+static bool parseIntValue(const std::string& line, const std::string& key, int& out) {
     double d;
-    if (!parseNumberValue(line, key, d)) return false;
+    if (!parseNumberValue(line, key, d))
+        return false;
     out = static_cast<int>(d);
     return true;
 }
 
 // Parse "key": true|false
-static bool parseBoolValue(const std::string& line, const std::string& key,
-                             bool& out) {
+static bool parseBoolValue(const std::string& line, const std::string& key, bool& out) {
     std::string needle = "\"" + key + "\"";
     size_t pos = line.find(needle);
-    if (pos == std::string::npos) return false;
+    if (pos == std::string::npos)
+        return false;
     size_t colon = line.find(':', pos + needle.size());
-    if (colon == std::string::npos) return false;
+    if (colon == std::string::npos)
+        return false;
     size_t v = line.find_first_not_of(" \t", colon + 1);
-    if (v == std::string::npos) return false;
-    if (line.substr(v, 4) == "true")  { out = true;  return true; }
-    if (line.substr(v, 5) == "false") { out = false; return true; }
+    if (v == std::string::npos)
+        return false;
+    if (line.substr(v, 4) == "true") {
+        out = true;
+        return true;
+    }
+    if (line.substr(v, 5) == "false") {
+        out = false;
+        return true;
+    }
     return false;
 }
 
 // ---- Slice record struct (internal) ----------------------------------------
 
 struct SliceRecord {
-    std::string filepath;       // basename only
-    bool        detected       = false;
-    int         n_bed_cands    = 0;
+    std::string filepath;  // basename only
+    bool detected = false;
+    int n_bed_cands = 0;
     std::vector<int> bed_ids;
-    int         new_body0_id   = -1;
+    int new_body0_id = -1;
     std::vector<int> envelope_y;
     std::vector<int> bottom_y;  // column-wise bottom y (-1 = no bed)
 };
@@ -178,8 +196,8 @@ struct SliceRecord {
 static std::string serializeSlice(const SliceRecord& sr) {
     std::string s;
     s += "    {\n";
-    s += "      \"filepath\": \""    + jsonEscape(sr.filepath) + "\",\n";
-    s += "      \"detected\": "       + std::string(sr.detected ? "true" : "false") + ",\n";
+    s += "      \"filepath\": \"" + jsonEscape(sr.filepath) + "\",\n";
+    s += "      \"detected\": " + std::string(sr.detected ? "true" : "false") + ",\n";
     s += "      \"n_bed_candidates\": " + std::to_string(sr.n_bed_cands) + ",\n";
     s += "      \"bed_component_ids\": " + intVecToJson(sr.bed_ids) + ",\n";
     s += "      \"new_body0_component_id\": " + std::to_string(sr.new_body0_id) + ",\n";
@@ -190,26 +208,24 @@ static std::string serializeSlice(const SliceRecord& sr) {
 }
 
 // ---- Convert BedDetector::Result → SliceRecord ---------------------------
-static SliceRecord resultToRecord(const std::string& basename,
-                                   const BedDetector::Result& result)
-{
+static SliceRecord resultToRecord(const std::string& basename, const BedDetector::Result& result) {
     SliceRecord sr;
-    sr.filepath     = basename;
-    sr.detected     = result.detected;
-    sr.n_bed_cands  = static_cast<int>(result.bed_candidates.size());
+    sr.filepath = basename;
+    sr.detected = result.detected;
+    sr.n_bed_cands = static_cast<int>(result.bed_candidates.size());
     for (const auto& cand : result.bed_candidates)
         sr.bed_ids.push_back(cand.component_id);
     sr.new_body0_id = result.new_body0_component_id;
-    sr.envelope_y   = result.envelope.y_at_col;
-    sr.bottom_y     = result.envelope.bottom_y_at_col;
+    sr.envelope_y = result.envelope.y_at_col;
+    sr.bottom_y = result.envelope.bottom_y_at_col;
     return sr;
 }
 
 // ---- Convert SliceRecord → BedDetector::Result (minimal fields) -----------
 static BedDetector::Result recordToResult(const SliceRecord& sr) {
     BedDetector::Result result;
-    result.detected     = sr.detected;
-    result.n_layers     = sr.n_bed_cands;
+    result.detected = sr.detected;
+    result.n_layers = sr.n_bed_cands;
     result.new_body0_component_id = sr.new_body0_id;
 
     // Restore bed_candidates (id only; metrics not cached)
@@ -221,8 +237,8 @@ static BedDetector::Result recordToResult(const SliceRecord& sr) {
 
     // Restore envelope
     result.envelope.y_at_col = sr.envelope_y;
-    result.envelope.width    = static_cast<int>(sr.envelope_y.size());
-    result.envelope.valid    = sr.detected;
+    result.envelope.width = static_cast<int>(sr.envelope_y.size());
+    result.envelope.valid = sr.detected;
 
     // Restore bottom_y; if the field is absent from the cache file, fill
     // with -1 to match width so callers can safely index.
@@ -236,12 +252,11 @@ static BedDetector::Result recordToResult(const SliceRecord& sr) {
 }
 
 // ---- Read all slice records from an existing cache file --------------------
-static bool readCacheFile(const std::string& path, double& file_beta,
-                           int& file_version, std::string& file_specimen_dir,
-                           std::vector<SliceRecord>& records)
-{
+static bool readCacheFile(const std::string& path, double& file_beta, int& file_version,
+                          std::string& file_specimen_dir, std::vector<SliceRecord>& records) {
     std::ifstream f(path);
-    if (!f.is_open()) return false;
+    if (!f.is_open())
+        return false;
 
     records.clear();
     file_beta = 0.0;
@@ -259,8 +274,8 @@ static bool readCacheFile(const std::string& path, double& file_beta,
 
         // Top-level fields
         if (!in_slices) {
-            parseNumberValue(t, "beta",         file_beta);
-            parseIntValue(t,    "version",      file_version);
+            parseNumberValue(t, "beta", file_beta);
+            parseIntValue(t, "version", file_version);
             parseStringValue(t, "specimen_dir", file_specimen_dir);
             if (t.find("\"slices\"") != std::string::npos)
                 in_slices = true;
@@ -279,15 +294,17 @@ static bool readCacheFile(const std::string& path, double& file_beta,
 
         // Inside a record
         for (char c : t) {
-            if (c == '{') ++brace_depth;
-            else if (c == '}') --brace_depth;
+            if (c == '{')
+                ++brace_depth;
+            else if (c == '}')
+                --brace_depth;
         }
 
         // Parse fields within the record
-        parseStringValue(t, "filepath",               current.filepath);
-        parseBoolValue(t,   "detected",                current.detected);
-        parseIntValue(t,    "n_bed_candidates",        current.n_bed_cands);
-        parseIntValue(t,    "new_body0_component_id",  current.new_body0_id);
+        parseStringValue(t, "filepath", current.filepath);
+        parseBoolValue(t, "detected", current.detected);
+        parseIntValue(t, "n_bed_candidates", current.n_bed_cands);
+        parseIntValue(t, "new_body0_component_id", current.new_body0_id);
 
         if (t.find("\"bed_component_ids\"") != std::string::npos)
             current.bed_ids = parseIntArray(t.substr(t.find("\"bed_component_ids\"")));
@@ -307,22 +324,22 @@ static bool readCacheFile(const std::string& path, double& file_beta,
 
 // ---- Write all slice records to a cache file --------------------------------
 static void writeCacheFile(const std::string& path, double beta, int version,
-                            const std::string& specimen_dir,
-                            const std::vector<SliceRecord>& records)
-{
+                           const std::string& specimen_dir,
+                           const std::vector<SliceRecord>& records) {
     std::ofstream f(path);
     if (!f.is_open())
         throw std::runtime_error("BedCache: cannot open for write: " + path);
 
     f << "{\n";
     f << "  \"version\": " << version << ",\n";
-    f << "  \"beta\": "    << betaToStr(beta) << ",\n";
+    f << "  \"beta\": " << betaToStr(beta) << ",\n";
     f << "  \"specimen_dir\": \"" << jsonEscape(specimen_dir) << "\",\n";
     f << "  \"slices\": [\n";
 
     for (int i = 0; i < static_cast<int>(records.size()); ++i) {
         f << serializeSlice(records[i]);
-        if (i + 1 < static_cast<int>(records.size())) f << ",";
+        if (i + 1 < static_cast<int>(records.size()))
+            f << ",";
         f << "\n";
     }
 
@@ -336,15 +353,13 @@ static void writeCacheFile(const std::string& path, double beta, int version,
 // BedCache public API
 // =============================================================================
 
-std::string BedCache::makeCachePath(const std::string& specimen_dir,
-                                     double beta, int version)
-{
+std::string BedCache::makeCachePath(const std::string& specimen_dir, double beta, int version) {
     char betaBuf[32];
     std::snprintf(betaBuf, sizeof(betaBuf), "%.3f", beta);
 
     fs::path dir = fs::path(specimen_dir) / ".skinpeeler";
-    std::string filename = std::string("bed_cache_beta") + betaBuf
-                         + "_v" + std::to_string(version) + ".json";
+    std::string filename =
+        std::string("bed_cache_beta") + betaBuf + "_v" + std::to_string(version) + ".json";
     return (dir / filename).string();
 }
 
@@ -358,14 +373,13 @@ bool BedCache::exists(const std::string& specimen_dir, double beta, int version)
 }
 
 bool BedCache::load(const std::string& specimen_dir, double beta, int version,
-                    const std::string& slice_filepath,
-                    BedDetector::Result& result_out)
-{
+                    const std::string& slice_filepath, BedDetector::Result& result_out) {
     std::string path = makeCachePath(specimen_dir, beta, version);
-    if (!fs::exists(fs::path(path))) return false;
+    if (!fs::exists(fs::path(path)))
+        return false;
 
     double file_beta = 0.0;
-    int    file_ver  = 0;
+    int file_ver = 0;
     std::string file_specimen;
     std::vector<SliceRecord> records;
 
@@ -373,7 +387,8 @@ bool BedCache::load(const std::string& specimen_dir, double beta, int version,
         return false;
 
     // Basic validation
-    if (file_ver != version) return false;
+    if (file_ver != version)
+        return false;
 
     std::string basename = makeBasename(slice_filepath);
 
@@ -387,9 +402,7 @@ bool BedCache::load(const std::string& specimen_dir, double beta, int version,
 }
 
 void BedCache::save(const std::string& specimen_dir, double beta, int version,
-                    const std::string& slice_filepath,
-                    const BedDetector::Result& result)
-{
+                    const std::string& slice_filepath, const BedDetector::Result& result) {
     std::string path = makeCachePath(specimen_dir, beta, version);
 
     // Ensure .skinpeeler/ directory exists
@@ -406,7 +419,7 @@ void BedCache::save(const std::string& specimen_dir, double beta, int version,
 
     // Read existing records
     double file_beta = 0.0;
-    int    file_ver  = 0;
+    int file_ver = 0;
     std::string file_specimen;
     std::vector<SliceRecord> records;
 
@@ -416,17 +429,18 @@ void BedCache::save(const std::string& specimen_dir, double beta, int version,
 
     // Upsert: replace or append
     std::string basename = makeBasename(slice_filepath);
-    SliceRecord newRec   = resultToRecord(basename, result);
+    SliceRecord newRec = resultToRecord(basename, result);
 
     bool found = false;
     for (auto& sr : records) {
         if (sr.filepath == basename) {
-            sr    = newRec;
+            sr = newRec;
             found = true;
             break;
         }
     }
-    if (!found) records.push_back(newRec);
+    if (!found)
+        records.push_back(newRec);
 
     writeCacheFile(path, beta, version, specimen_dir, records);
 }

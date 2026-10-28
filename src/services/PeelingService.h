@@ -36,12 +36,10 @@ public:
     //   onProgress       : optional, called after each slice
     //   isCancelled      : optional, polled before each slice
     // -------------------------------------------------------------------------
-    static void peelAutoMode(
-        std::vector<std::unique_ptr<CTImage>>& images,
-        int thicknessIncrement = 0,
-        PeelRegion region = PeelRegion::WholeBody,
-        const ProgressCallback& onProgress = nullptr,
-        const CancelCallback& isCancelled = nullptr);
+    static void peelAutoMode(std::vector<std::unique_ptr<CTImage>>& images,
+                             int thicknessIncrement = 0, PeelRegion region = PeelRegion::WholeBody,
+                             const ProgressCallback& onProgress = nullptr,
+                             const CancelCallback& isCancelled = nullptr);
 
     // -------------------------------------------------------------------------
     // Uniform mode: user sets peel_index for N key sections;
@@ -52,25 +50,22 @@ public:
     //   onProgress       : optional, called after each slice
     //   isCancelled      : optional, polled before each slice
     // -------------------------------------------------------------------------
-    static void peelUniformMode(
-        std::vector<std::unique_ptr<CTImage>>& images,
-        const std::vector<int>& sections,
-        const std::vector<int>& sectionThicknesses,
-        PeelRegion region = PeelRegion::WholeBody,
-        const ProgressCallback& onProgress = nullptr,
-        const CancelCallback& isCancelled = nullptr);
+    static void peelUniformMode(std::vector<std::unique_ptr<CTImage>>& images,
+                                const std::vector<int>& sections,
+                                const std::vector<int>& sectionThicknesses,
+                                PeelRegion region = PeelRegion::WholeBody,
+                                const ProgressCallback& onProgress = nullptr,
+                                const CancelCallback& isCancelled = nullptr);
 
     // Half-peel (right-half only), auto mode
-    static void halfPeelAutoMode(
-        std::vector<std::unique_ptr<CTImage>>& images,
-        int thicknessIncrement = 0);
+    static void halfPeelAutoMode(std::vector<std::unique_ptr<CTImage>>& images,
+                                 int thicknessIncrement = 0);
 
     // Compute evenly-spaced section indices for numSections key slices
     static std::vector<int> computeSectionIndices(int totalImages, int numSections);
 
     // Linear interpolation of thickness across sections
-    static std::vector<double> interpolateThickness(
-        int totalImages,
-        const std::vector<int>& sections,
-        const std::vector<int>& thicknesses);
+    static std::vector<double> interpolateThickness(int totalImages,
+                                                    const std::vector<int>& sections,
+                                                    const std::vector<int>& thicknesses);
 };

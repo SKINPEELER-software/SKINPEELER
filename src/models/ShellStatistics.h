@@ -43,7 +43,7 @@ int cuttingEuclideanDistance(const std::vector<std::pair<double, double>>& point
 // threshold.
 // -------------------------------------------------------------------------
 int findDistanceJump(const std::vector<std::pair<double, double>>& points, int offset,
-                      double distanceJumpSigma);
+                     double distanceJumpSigma);
 
 // -------------------------------------------------------------------------
 // SigmaCuttingResult — result of the 3-sigma ellipse cutting-point
@@ -67,7 +67,7 @@ struct SigmaCuttingResult {
 // the first point is inside.
 // -------------------------------------------------------------------------
 SigmaCuttingResult cutting3SigmaDistance(const std::vector<std::pair<double, double>>& points,
-                                          int offset, double sigmaThreshold,
-                                          double distanceJumpSigma);
+                                         int offset, double sigmaThreshold,
+                                         double distanceJumpSigma);
 
 }  // namespace ShellStatistics

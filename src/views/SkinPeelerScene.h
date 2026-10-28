@@ -25,8 +25,12 @@ class SkinPeelerView : public QGraphicsView {
 public:
     explicit SkinPeelerView(QWidget* parent = nullptr);
 
-    void setAnnotationMode(bool on) { m_annotationMode = on; }
-    bool annotationMode() const { return m_annotationMode; }
+    void setAnnotationMode(bool on) {
+        m_annotationMode = on;
+    }
+    bool annotationMode() const {
+        return m_annotationMode;
+    }
 
 signals:
     // Emitted when the user paints in annotation mode (scene coordinates)
@@ -39,8 +43,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
-    bool   m_panning        = false;
-    bool   m_annotationMode = false;
+    bool m_panning = false;
+    bool m_annotationMode = false;
     QPoint m_lastPanPoint;
 };
 
@@ -55,11 +59,8 @@ public:
 
     void displayCTImage(const CTImage& img);
 
-    void setShellOverlay(
-        const std::vector<CTShell>& shells,
-        int                          maxShell,
-        const QColor&                color,
-        PeelRegion                   region = PeelRegion::WholeBody);
+    void setShellOverlay(const std::vector<CTShell>& shells, int maxShell, const QColor& color,
+                         PeelRegion region = PeelRegion::WholeBody);
     void clearShellOverlays();
 
     void addVisualizationMask(const QRectF& rect);
@@ -87,18 +88,22 @@ public:
     // Export binary mask (white=annotated, black=not)
     QImage exportMaskImage() const;
 
-    int imageWidth()  const { return m_imageWidth; }
-    int imageHeight() const { return m_imageHeight; }
+    int imageWidth() const {
+        return m_imageWidth;
+    }
+    int imageHeight() const {
+        return m_imageHeight;
+    }
 
 private:
     void updateAnnotationOverlay();
 
-    QGraphicsPixmapItem* m_pixmapItem           = nullptr;
-    QGraphicsPixmapItem* m_shellOverlayItem     = nullptr;
+    QGraphicsPixmapItem* m_pixmapItem = nullptr;
+    QGraphicsPixmapItem* m_shellOverlayItem = nullptr;
     QGraphicsPixmapItem* m_annotationOverlayItem = nullptr;
-    QGraphicsRectItem*   m_maskItem             = nullptr;
+    QGraphicsRectItem* m_maskItem = nullptr;
 
-    int m_imageWidth  = 0;
+    int m_imageWidth = 0;
     int m_imageHeight = 0;
 
     // Annotation mask: 8-bit grayscale, 255=annotated, 0=not

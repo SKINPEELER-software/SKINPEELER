@@ -13,12 +13,8 @@
 #include <QFrame>
 #include <QTimer>
 
-PlotWindow::PlotWindow(PlotWidget* plotWidget,
-                       const QString& title,
-                       QWidget* parent)
-    : QDialog(parent)
-    , m_plot(plotWidget)
-{
+PlotWindow::PlotWindow(PlotWidget* plotWidget, const QString& title, QWidget* parent)
+    : QDialog(parent), m_plot(plotWidget) {
     setWindowTitle(title);
     setMinimumSize(1050, 680);
     resize(1150, 800);
@@ -33,7 +29,7 @@ PlotWindow::PlotWindow(PlotWidget* plotWidget,
     // Add an axis-range control panel when the plot is a GaussianPlotWidget
     // or ScatterPlotWidget
     bool isGaussian = qobject_cast<GaussianPlotWidget*>(m_plot) != nullptr;
-    bool isScatter  = qobject_cast<ScatterPlotWidget*>(m_plot)  != nullptr;
+    bool isScatter = qobject_cast<ScatterPlotWidget*>(m_plot) != nullptr;
     if (isGaussian || isScatter) {
         auto* ctrlWidget = new QWidget(this);
         ctrlWidget->setMaximumHeight(40);
@@ -92,45 +88,53 @@ PlotWindow::PlotWindow(PlotWidget* plotWidget,
         auto applyY = [pw, yMinSpin, yMaxSpin]() {
             pw->setYRange(yMinSpin->value(), yMaxSpin->value());
         };
-        connect(xMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                ctrlWidget, [applyX](double){ applyX(); });
-        connect(xMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                ctrlWidget, [applyX](double){ applyX(); });
-        connect(yMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                ctrlWidget, [applyY](double){ applyY(); });
-        connect(yMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-                ctrlWidget, [applyY](double){ applyY(); });
-        connect(resetBtn, &QPushButton::clicked,
-                pw, &PlotWidget::resetAxisRange);
+        connect(xMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), ctrlWidget,
+                [applyX](double) { applyX(); });
+        connect(xMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), ctrlWidget,
+                [applyX](double) { applyX(); });
+        connect(yMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), ctrlWidget,
+                [applyY](double) { applyY(); });
+        connect(yMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), ctrlWidget,
+                [applyY](double) { applyY(); });
+        connect(resetBtn, &QPushButton::clicked, pw, &PlotWidget::resetAxisRange);
 
         // After first paint: initialize spinboxes with auto-computed range
-        connect(resetBtn, &QPushButton::clicked, ctrlWidget, [pw, xMinSpin, xMaxSpin, yMinSpin, yMaxSpin]() {
-            // When reset is clicked, also update spinboxes to reflect auto range
-            // (Need to defer by one event loop tick after update() call in resetAxisRange)
-            QTimer::singleShot(0, [pw, xMinSpin, xMaxSpin, yMinSpin, yMaxSpin]() {
-                auto blockAll = [](QWidget* w, bool b){ w->blockSignals(b); };
-                blockAll(xMinSpin, true); blockAll(xMaxSpin, true);
-                blockAll(yMinSpin, true); blockAll(yMaxSpin, true);
-                xMinSpin->setValue(pw->lastXMin());
-                xMaxSpin->setValue(pw->lastXMax());
-                yMinSpin->setValue(pw->lastYMin());
-                yMaxSpin->setValue(pw->lastYMax());
-                blockAll(xMinSpin, false); blockAll(xMaxSpin, false);
-                blockAll(yMinSpin, false); blockAll(yMaxSpin, false);
-            });
-        });
+        connect(resetBtn, &QPushButton::clicked, ctrlWidget,
+                [pw, xMinSpin, xMaxSpin, yMinSpin, yMaxSpin]() {
+                    // When reset is clicked, also update spinboxes to reflect auto range
+                    // (Need to defer by one event loop tick after update() call in resetAxisRange)
+                    QTimer::singleShot(0, [pw, xMinSpin, xMaxSpin, yMinSpin, yMaxSpin]() {
+                        auto blockAll = [](QWidget* w, bool b) { w->blockSignals(b); };
+                        blockAll(xMinSpin, true);
+                        blockAll(xMaxSpin, true);
+                        blockAll(yMinSpin, true);
+                        blockAll(yMaxSpin, true);
+                        xMinSpin->setValue(pw->lastXMin());
+                        xMaxSpin->setValue(pw->lastXMax());
+                        yMinSpin->setValue(pw->lastYMin());
+                        yMaxSpin->setValue(pw->lastYMax());
+                        blockAll(xMinSpin, false);
+                        blockAll(xMaxSpin, false);
+                        blockAll(yMinSpin, false);
+                        blockAll(yMaxSpin, false);
+                    });
+                });
 
         // Initialize spinboxes after first paint (50ms delay to ensure paint has occurred)
         QTimer::singleShot(50, ctrlWidget, [pw, xMinSpin, xMaxSpin, yMinSpin, yMaxSpin]() {
-            auto blockAll = [](QWidget* w, bool b){ w->blockSignals(b); };
-            blockAll(xMinSpin, true); blockAll(xMaxSpin, true);
-            blockAll(yMinSpin, true); blockAll(yMaxSpin, true);
+            auto blockAll = [](QWidget* w, bool b) { w->blockSignals(b); };
+            blockAll(xMinSpin, true);
+            blockAll(xMaxSpin, true);
+            blockAll(yMinSpin, true);
+            blockAll(yMaxSpin, true);
             xMinSpin->setValue(pw->lastXMin());
             xMaxSpin->setValue(pw->lastXMax());
             yMinSpin->setValue(pw->lastYMin());
             yMaxSpin->setValue(pw->lastYMax());
-            blockAll(xMinSpin, false); blockAll(xMaxSpin, false);
-            blockAll(yMinSpin, false); blockAll(yMaxSpin, false);
+            blockAll(xMinSpin, false);
+            blockAll(xMaxSpin, false);
+            blockAll(yMinSpin, false);
+            blockAll(yMaxSpin, false);
         });
     }
 
@@ -149,12 +153,13 @@ PlotWindow::PlotWindow(PlotWidget* plotWidget,
     connect(m_saveBtn, &QPushButton::clicked, this, &PlotWindow::onSave);
 }
 
-void PlotWindow::onSave()
-{
-    if (!m_plot) return;
-    QString filename = QFileDialog::getSaveFileName(
-        this, "Save Plot", QString(), "PNG Images (*.png);;All Files (*)");
-    if (filename.isEmpty()) return;
+void PlotWindow::onSave() {
+    if (!m_plot)
+        return;
+    QString filename = QFileDialog::getSaveFileName(this, "Save Plot", QString(),
+                                                    "PNG Images (*.png);;All Files (*)");
+    if (filename.isEmpty())
+        return;
 
     // Ensure extension
     if (!filename.endsWith(".png", Qt::CaseInsensitive))

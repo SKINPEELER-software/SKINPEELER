@@ -70,18 +70,15 @@ public:
     // Returns true and fills result_out on hit; returns false on miss or parse error.
     // slice_filepath: full path to the DICOM file (basename is used for matching).
     static bool load(const std::string& specimen_dir, double beta, int version,
-                     const std::string& slice_filepath,
-                     BedDetector::Result& result_out);
+                     const std::string& slice_filepath, BedDetector::Result& result_out);
 
     // Save (upsert) the Result for a specific slice file.
     // Creates the .skinpeeler/ directory and cache file if they do not exist.
     // Existing entries for the same slice_filepath are replaced.
     static void save(const std::string& specimen_dir, double beta, int version,
-                     const std::string& slice_filepath,
-                     const BedDetector::Result& result);
+                     const std::string& slice_filepath, const BedDetector::Result& result);
 
 private:
-    static std::string makeCachePath(const std::string& specimen_dir,
-                                     double beta, int version);
+    static std::string makeCachePath(const std::string& specimen_dir, double beta, int version);
     static std::string makeBasename(const std::string& filepath);
 };

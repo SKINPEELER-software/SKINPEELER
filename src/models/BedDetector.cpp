@@ -14,17 +14,17 @@
 // Returns coefficients [a0, a1, ..., a_degree] or empty on failure.
 // =============================================================================
 std::vector<double> BedDetector::fitPolynomial(const std::vector<double>& x,
-                                                const std::vector<double>& y,
-                                                int degree)
-{
+                                               const std::vector<double>& y, int degree) {
     const int n = static_cast<int>(x.size());
-    if (n < degree + 1 || n < 2) return {};
+    if (n < degree + 1 || n < 2)
+        return {};
 
     // Normalise x to [-1, 1] for numerical stability
     double xmin = *std::min_element(x.begin(), x.end());
     double xmax = *std::max_element(x.begin(), x.end());
     double xrange = xmax - xmin;
-    if (xrange < 1e-10) return {};
+    if (xrange < 1e-10)
+        return {};
 
     const int d = degree + 1;  // number of coefficients
 
@@ -38,7 +38,7 @@ std::vector<double> BedDetector::fitPolynomial(const std::vector<double>& x,
         std::vector<double> powers(d);
         powers[0] = 1.0;
         for (int j = 1; j < d; ++j)
-            powers[j] = powers[j-1] * xn;
+            powers[j] = powers[j - 1] * xn;
 
         for (int r = 0; r < d; ++r) {
             Xty[r] += powers[r] * y[i];
@@ -52,38 +52,43 @@ std::vector<double> BedDetector::fitPolynomial(const std::vector<double>& x,
     std::vector<double> aug(d * (d + 1));
     for (int r = 0; r < d; ++r) {
         for (int c = 0; c < d; ++c)
-            aug[r * (d+1) + c] = XtX[r * d + c];
-        aug[r * (d+1) + d] = Xty[r];
+            aug[r * (d + 1) + c] = XtX[r * d + c];
+        aug[r * (d + 1) + d] = Xty[r];
     }
 
     for (int col = 0; col < d; ++col) {
         // Partial pivot
         int pivot = col;
-        double maxVal = std::abs(aug[col * (d+1) + col]);
+        double maxVal = std::abs(aug[col * (d + 1) + col]);
         for (int row = col + 1; row < d; ++row) {
-            double v = std::abs(aug[row * (d+1) + col]);
-            if (v > maxVal) { maxVal = v; pivot = row; }
+            double v = std::abs(aug[row * (d + 1) + col]);
+            if (v > maxVal) {
+                maxVal = v;
+                pivot = row;
+            }
         }
-        if (maxVal < 1e-12) return {};  // singular
+        if (maxVal < 1e-12)
+            return {};  // singular
 
         if (pivot != col) {
             for (int c = 0; c <= d; ++c)
-                std::swap(aug[col * (d+1) + c], aug[pivot * (d+1) + c]);
+                std::swap(aug[col * (d + 1) + c], aug[pivot * (d + 1) + c]);
         }
 
-        double diag = aug[col * (d+1) + col];
+        double diag = aug[col * (d + 1) + col];
         for (int row = 0; row < d; ++row) {
-            if (row == col) continue;
-            double factor = aug[row * (d+1) + col] / diag;
+            if (row == col)
+                continue;
+            double factor = aug[row * (d + 1) + col] / diag;
             for (int c = col; c <= d; ++c)
-                aug[row * (d+1) + c] -= factor * aug[col * (d+1) + c];
+                aug[row * (d + 1) + c] -= factor * aug[col * (d + 1) + c];
         }
     }
 
     // Extract solution in normalised domain
     std::vector<double> cn(d);
     for (int r = 0; r < d; ++r)
-        cn[r] = aug[r * (d+1) + d] / aug[r * (d+1) + r];
+        cn[r] = aug[r * (d + 1) + d] / aug[r * (d + 1) + r];
 
     // Convert coefficients from normalised x back to original x domain.
     // x_norm = 2*(x - xmin)/xrange - 1  =>  x = xnorm * xrange/2 + xmin + xrange/2
@@ -120,13 +125,14 @@ std::vector<double> BedDetector::fitPolynomial(const std::vector<double>& x,
 // original-domain curvature for a bed spanning ~250 px, causing every bed
 // candidate to be rejected as "too curved".
 // =============================================================================
-double BedDetector::maxCurvature(const std::vector<double>& coeffs,
-                                  double x0, double x1, int n_samples)
-{
-    if (coeffs.empty() || n_samples < 1) return 0.0;
+double BedDetector::maxCurvature(const std::vector<double>& coeffs, double x0, double x1,
+                                 int n_samples) {
+    if (coeffs.empty() || n_samples < 1)
+        return 0.0;
 
     const double xrange = x1 - x0;
-    if (xrange < 1e-10) return 0.0;
+    if (xrange < 1e-10)
+        return 0.0;
 
     // Scale factor: derivative in original domain = derivative in norm domain * scale
     const double scale = 2.0 / xrange;
@@ -144,30 +150,32 @@ double BedDetector::maxCurvature(const std::vector<double>& coeffs,
         // Compute y'_norm and y''_norm in the normalised domain.
         // y'_norm  = sum_{k=1}^{d-1}  k          * coeffs[k] * xn^(k-1)
         // y''_norm = sum_{k=2}^{d-1}  k*(k-1)    * coeffs[k] * xn^(k-2)
-        double yp_norm  = 0.0;
+        double yp_norm = 0.0;
         double ypp_norm = 0.0;
 
         for (int k = 1; k < d; ++k) {
             // xn^(k-1)
             double xn_km1 = 1.0;
-            for (int j = 0; j < k - 1; ++j) xn_km1 *= xn;
+            for (int j = 0; j < k - 1; ++j)
+                xn_km1 *= xn;
             yp_norm += static_cast<double>(k) * coeffs[k] * xn_km1;
         }
         for (int k = 2; k < d; ++k) {
             // xn^(k-2)
             double xn_km2 = 1.0;
-            for (int j = 0; j < k - 2; ++j) xn_km2 *= xn;
-            ypp_norm += static_cast<double>(k) * static_cast<double>(k - 1)
-                        * coeffs[k] * xn_km2;
+            for (int j = 0; j < k - 2; ++j)
+                xn_km2 *= xn;
+            ypp_norm += static_cast<double>(k) * static_cast<double>(k - 1) * coeffs[k] * xn_km2;
         }
 
         // Convert to original pixel domain.
-        double yp_orig  = yp_norm  * scale;
+        double yp_orig = yp_norm * scale;
         double ypp_orig = ypp_norm * scale * scale;
 
         double denom = 1.0 + yp_orig * yp_orig;
         double kappa = std::abs(ypp_orig) / std::pow(denom, 1.5);
-        if (kappa > maxK) maxK = kappa;
+        if (kappa > maxK)
+            maxK = kappa;
     }
 
     return maxK;
@@ -189,13 +197,11 @@ double BedDetector::maxCurvature(const std::vector<double>& coeffs,
 //   pass condition: all column y values >= chord_y(col) - chord_tolerance_px
 //   i.e., no point is above the chord by more than tolerance
 // =============================================================================
-bool BedDetector::checkSagAndChord(BedCandidate& candidate,
-                                    double min_sag_pixels,
-                                    double chord_tolerance_px)
-{
+bool BedDetector::checkSagAndChord(BedCandidate& candidate, double min_sag_pixels,
+                                   double chord_tolerance_px) {
     const int n = static_cast<int>(candidate.top_boundary_cols.size());
     if (n < 3) {
-        candidate.sag_pixels   = 0.0;
+        candidate.sag_pixels = 0.0;
         candidate.below_chord_ok = false;
         return false;
     }
@@ -211,7 +217,7 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
     int col_max = cols.back();
     int col_span = col_max - col_min;
     if (col_span < 1) {
-        candidate.sag_pixels   = 0.0;
+        candidate.sag_pixels = 0.0;
         candidate.below_chord_ok = false;
         return false;
     }
@@ -219,12 +225,14 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
     // ----- (e-1) sag check -----
     // Edge zone: leftmost 10% and rightmost 10% of column range
     // Center zone: 40%~60%
-    const double edge_frac   = 0.10;
-    const double center_low  = 0.40;
+    const double edge_frac = 0.10;
+    const double center_low = 0.40;
     const double center_high = 0.60;
 
-    double y_edge_sum = 0.0;  int y_edge_cnt = 0;
-    double y_center_sum = 0.0; int y_center_cnt = 0;
+    double y_edge_sum = 0.0;
+    int y_edge_cnt = 0;
+    double y_center_sum = 0.0;
+    int y_center_cnt = 0;
 
     for (int i = 0; i < n; ++i) {
         double frac = static_cast<double>(cols[i] - col_min) / col_span;
@@ -239,12 +247,12 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
     }
 
     if (y_edge_cnt < 1 || y_center_cnt < 1) {
-        candidate.sag_pixels   = 0.0;
+        candidate.sag_pixels = 0.0;
         candidate.below_chord_ok = false;
         return false;
     }
 
-    double y_edge_mean   = y_edge_sum   / y_edge_cnt;
+    double y_edge_mean = y_edge_sum / y_edge_cnt;
     double y_center_mean = y_center_sum / y_center_cnt;
     candidate.sag_pixels = y_center_mean - y_edge_mean;
 
@@ -253,13 +261,12 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
     // ----- (e-2) below-chord check -----
     // Chord from first point to last point in the boundary
     double col_first = static_cast<double>(cols.front());
-    double col_last  = static_cast<double>(cols.back());
+    double col_last = static_cast<double>(cols.back());
     double row_first = static_cast<double>(rows.front());
-    double row_last  = static_cast<double>(rows.back());
+    double row_last = static_cast<double>(rows.back());
 
-    double chord_slope = (col_last > col_first)
-        ? (row_last - row_first) / (col_last - col_first)
-        : 0.0;
+    double chord_slope =
+        (col_last > col_first) ? (row_last - row_first) / (col_last - col_first) : 0.0;
 
     bool chord_ok = true;
     for (int i = 0; i < n; ++i) {
@@ -298,13 +305,13 @@ bool BedDetector::checkSagAndChord(BedCandidate& candidate,
 //   row: max(0, cy_px - scan_margin) … min(height-1, cy_px + scan_margin)
 // =============================================================================
 void BedDetector::extractTopBoundary(const uint16_t* image, int width, int height,
-                                      const VDComponentInfo& vd, BedCandidate& candidate)
-{
+                                     const VDComponentInfo& vd, BedCandidate& candidate) {
     candidate.top_boundary_rows.clear();
     candidate.top_boundary_cols.clear();
     candidate.bottom_boundary_rows.clear();  // reset bottom boundary
 
-    if (!image || width <= 0 || height <= 0) return;
+    if (!image || width <= 0 || height <= 0)
+        return;
 
     // Centroid in pixel space.
     // V-IP coordinate convention (BetaUniverse2D::constructForImageProcessing):
@@ -319,16 +326,16 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
     const double scan_margin = radius * 1.5;
 
     const int row_start = std::max(0, static_cast<int>(std::floor(cy_px - scan_margin)));
-    const int row_end   = std::min(height - 1, static_cast<int>(std::ceil(cy_px + scan_margin)));
+    const int row_end = std::min(height - 1, static_cast<int>(std::ceil(cy_px + scan_margin)));
 
     // Column scan: full image width.
     // The VD component area does not represent the pixel-space extent of the bed,
     // so we cannot use it to limit the column range.
     const int col_start = 0;
-    const int col_end   = width - 1;
+    const int col_end = width - 1;
 
     for (int c = col_start; c <= col_end; ++c) {
-        int top_row    = -1;
+        int top_row = -1;
         int bottom_row = -1;
 
         // Forward scan: find topmost (minimum row) foreground pixel
@@ -339,7 +346,8 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
             }
         }
 
-        if (top_row < 0) continue;  // no foreground in this column
+        if (top_row < 0)
+            continue;  // no foreground in this column
 
         // Reverse scan from row_end downward to find bottommost foreground pixel
         for (int r = row_end; r >= top_row; --r) {
@@ -348,7 +356,8 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
                 break;
             }
         }
-        if (bottom_row < 0) bottom_row = top_row;  // single pixel: top == bottom
+        if (bottom_row < 0)
+            bottom_row = top_row;  // single pixel: top == bottom
 
         candidate.top_boundary_rows.push_back(top_row);
         candidate.top_boundary_cols.push_back(c);
@@ -377,27 +386,23 @@ void BedDetector::extractTopBoundary(const uint16_t* image, int width, int heigh
 // (e) general convexity: sag check + below-chord check
 // (f) avg thickness >= min_thickness_px  (cloth exclusion: cloth is thin)
 // =============================================================================
-bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
-                                  int image_width, int image_height,
-                                  const uint16_t* image,
-                                  const Params& params,
-                                  BedCandidate& candidate_out,
-                                  DebugRecord& debug_out)
-{
+bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy, int image_width,
+                                 int image_height, const uint16_t* image, const Params& params,
+                                 BedCandidate& candidate_out, DebugRecord& debug_out) {
     // Populate basic fields
     candidate_out.component_id = vd.id;
-    candidate_out.centroid_x   = vd.centroid_x;
-    candidate_out.centroid_y   = vd.centroid_y;
-    candidate_out.area         = vd.area;
-    candidate_out.circularity  = vd.circularity;
+    candidate_out.centroid_x = vd.centroid_x;
+    candidate_out.centroid_y = vd.centroid_y;
+    candidate_out.area = vd.area;
+    candidate_out.circularity = vd.circularity;
 
     // Populate debug basic fields (always recorded regardless of fail stage)
     debug_out.component_id = vd.id;
-    debug_out.area         = vd.area;
-    debug_out.circularity  = vd.circularity;
-    debug_out.centroid_y   = vd.centroid_y;
-    debug_out.centroid_x   = vd.centroid_x;
-    debug_out.score        = vd.score;
+    debug_out.area = vd.area;
+    debug_out.circularity = vd.circularity;
+    debug_out.centroid_y = vd.centroid_y;
+    debug_out.centroid_x = vd.centroid_x;
+    debug_out.score = vd.score;
 
     // Convert Voronoi centroid_y to pixel row for position check.
     //
@@ -440,9 +445,9 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
     // Poly fit for (d) curvature check
     {
         std::vector<double> x_d(candidate_out.top_boundary_cols.begin(),
-                                 candidate_out.top_boundary_cols.end());
+                                candidate_out.top_boundary_cols.end());
         std::vector<double> y_d(candidate_out.top_boundary_rows.begin(),
-                                 candidate_out.top_boundary_rows.end());
+                                candidate_out.top_boundary_rows.end());
 
         candidate_out.poly_coeffs = fitPolynomial(x_d, y_d, params.poly_degree);
         if (candidate_out.poly_coeffs.empty()) {
@@ -454,8 +459,8 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
         // original-domain curvature [1/px] for comparison with theta_curv.
         const double x_col_min = static_cast<double>(candidate_out.top_boundary_cols.front());
         const double x_col_max = static_cast<double>(candidate_out.top_boundary_cols.back());
-        candidate_out.max_curvature = maxCurvature(candidate_out.poly_coeffs,
-                                                    x_col_min, x_col_max, 50);
+        candidate_out.max_curvature =
+            maxCurvature(candidate_out.poly_coeffs, x_col_min, x_col_max, 50);
         debug_out.max_curvature = candidate_out.max_curvature;
     }
 
@@ -466,10 +471,9 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
     }
 
     // (e) general convexity check
-    bool convex_ok = checkSagAndChord(candidate_out,
-                                       params.min_sag_pixels,
-                                       params.chord_tolerance_px);
-    debug_out.sag_pixels     = candidate_out.sag_pixels;
+    bool convex_ok =
+        checkSagAndChord(candidate_out, params.min_sag_pixels, params.chord_tolerance_px);
+    debug_out.sag_pixels = candidate_out.sag_pixels;
     debug_out.below_chord_ok = candidate_out.below_chord_ok;
     if (!convex_ok) {
         debug_out.fail_reason = "convex";
@@ -489,8 +493,8 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
         if (n_bnd > 0 && n_bot == n_bnd) {
             double thickness_sum = 0.0;
             for (int i = 0; i < n_bnd; ++i) {
-                thickness_sum += static_cast<double>(
-                    candidate_out.bottom_boundary_rows[i] - candidate_out.top_boundary_rows[i]);
+                thickness_sum += static_cast<double>(candidate_out.bottom_boundary_rows[i] -
+                                                     candidate_out.top_boundary_rows[i]);
             }
             const double avg_thickness = thickness_sum / static_cast<double>(n_bnd);
             debug_out.thickness_px = avg_thickness;
@@ -511,13 +515,12 @@ bool BedDetector::isBedCandidate(const VDComponentInfo& vd, double body0_cy,
 // detect
 // Main detection entry point.
 // =============================================================================
-BedDetector::Result BedDetector::detect(
-    const std::vector<VDComponentInfo>& vd_components,
-    const uint16_t* image, int width, int height,
-    double body0_cy, const Params& params)
-{
+BedDetector::Result BedDetector::detect(const std::vector<VDComponentInfo>& vd_components,
+                                        const uint16_t* image, int width, int height,
+                                        double body0_cy, const Params& params) {
     Result result;
-    if (vd_components.empty() || !image) return result;
+    if (vd_components.empty() || !image)
+        return result;
 
     // Identify current body0 id (score-maximum = index 0)
     const int current_body0_id = vd_components[0].id;
@@ -535,7 +538,7 @@ BedDetector::Result BedDetector::detect(
     // replacement logic below.
     for (const auto& comp : vd_components) {
         BedCandidate candidate;
-        DebugRecord  drec;
+        DebugRecord drec;
 
         if (isBedCandidate(comp, body0_cy, width, height, image, params, candidate, drec)) {
             result.bed_candidates.push_back(std::move(candidate));
@@ -577,16 +580,15 @@ BedDetector::Result BedDetector::detect(
     for (const auto& cand : result.bed_candidates) {
         const int n_pts = static_cast<int>(cand.top_boundary_cols.size());
         for (int i = 0; i < n_pts; ++i) {
-            int c      = cand.top_boundary_cols[i];
-            int top_r  = cand.top_boundary_rows[i];
-            int bot_r  = (i < static_cast<int>(cand.bottom_boundary_rows.size()))
-                         ? cand.bottom_boundary_rows[i]
-                         : top_r;  // fallback: no bottom data → use top
+            int c = cand.top_boundary_cols[i];
+            int top_r = cand.top_boundary_rows[i];
+            int bot_r = (i < static_cast<int>(cand.bottom_boundary_rows.size()))
+                            ? cand.bottom_boundary_rows[i]
+                            : top_r;  // fallback: no bottom data → use top
 
             if (c >= 0 && c < width) {
                 // top y: take minimum (topmost row)
-                if (result.envelope.y_at_col[c] < 0 ||
-                    top_r < result.envelope.y_at_col[c]) {
+                if (result.envelope.y_at_col[c] < 0 || top_r < result.envelope.y_at_col[c]) {
                     result.envelope.y_at_col[c] = top_r;
                 }
                 // bottom y: take maximum (bottommost row)
@@ -605,8 +607,8 @@ BedDetector::Result BedDetector::detect(
     // bottom_y_at_col is not clamped — the bed bottom is always near the
     // image bottom, so it already lies below the clamp row.
     if (result.detected && params.top_clamp_ratio > 0.0) {
-        const int top_clamp_row = static_cast<int>(
-            static_cast<double>(height) * params.top_clamp_ratio);
+        const int top_clamp_row =
+            static_cast<int>(static_cast<double>(height) * params.top_clamp_ratio);
         for (int col = 0; col < width; ++col) {
             if (result.envelope.y_at_col[col] >= 0 &&
                 result.envelope.y_at_col[col] < top_clamp_row) {
@@ -619,7 +621,7 @@ BedDetector::Result BedDetector::detect(
     if (result.detected && body0_is_bed) {
         // Find best non-bed component (highest score)
         double best_score = -1.0;
-        int    best_id    = -1;
+        int best_id = -1;
 
         // Collect bed ids
         std::vector<int> bed_ids;
@@ -630,7 +632,7 @@ BedDetector::Result BedDetector::detect(
             bool is_bed = (std::find(bed_ids.begin(), bed_ids.end(), comp.id) != bed_ids.end());
             if (!is_bed && comp.score > best_score) {
                 best_score = comp.score;
-                best_id    = comp.id;
+                best_id = comp.id;
             }
         }
         result.new_body0_component_id = best_id;

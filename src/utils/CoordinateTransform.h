@@ -25,34 +25,28 @@
 class CoordinateTransform {
 public:
     // Returns (row, col) in image pixel space
-    static std::pair<int, int> voronoiToImagePixel(
-        double vx, double vy,
-        int imageHeight, int imageWidth)
-    {
-        int col = static_cast<int>(vx + imageWidth  / 2.0 - COORDINATE_OFFSET);
+    static std::pair<int, int> voronoiToImagePixel(double vx, double vy, int imageHeight,
+                                                   int imageWidth) {
+        int col = static_cast<int>(vx + imageWidth / 2.0 - COORDINATE_OFFSET);
         int row = static_cast<int>(vy + imageHeight / 2.0 - COORDINATE_OFFSET);
         return {row, col};
     }
 
     // Returns (scene_x, scene_y) for Qt graphics scene
-    static std::pair<double, double> voronoiToScene(
-        double vx, double vy,
-        int imageHeight, int imageWidth)
-    {
-        double sx = vx + imageWidth  / 2.0 - COORDINATE_OFFSET;
+    static std::pair<double, double> voronoiToScene(double vx, double vy, int imageHeight,
+                                                    int imageWidth) {
+        double sx = vx + imageWidth / 2.0 - COORDINATE_OFFSET;
         double sy = vy + imageHeight / 2.0 - COORDINATE_OFFSET;
         return {sx, sy};
     }
 
-    static bool isValidPixel(int row, int col, int imageHeight, int imageWidth)
-    {
+    static bool isValidPixel(int row, int col, int imageHeight, int imageWidth) {
         return row >= 0 && row < imageHeight && col >= 0 && col < imageWidth;
     }
 
-    static std::pair<int, int> clipToBounds(int row, int col, int imageHeight, int imageWidth)
-    {
+    static std::pair<int, int> clipToBounds(int row, int col, int imageHeight, int imageWidth) {
         row = std::max(0, std::min(row, imageHeight - 1));
-        col = std::max(0, std::min(col, imageWidth  - 1));
+        col = std::max(0, std::min(col, imageWidth - 1));
         return {row, col};
     }
 };

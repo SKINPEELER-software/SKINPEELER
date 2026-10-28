@@ -35,19 +35,31 @@ public:
     void addVertex(double x, double y, double radius);
     void clear();
 
-    const std::vector<VertexData>& vertices() const { return m_vertices; }
-    std::size_t size() const { return m_vertices.size(); }
-    bool isEmpty() const   { return m_vertices.empty(); }
+    const std::vector<VertexData>& vertices() const {
+        return m_vertices;
+    }
+    std::size_t size() const {
+        return m_vertices.size();
+    }
+    bool isEmpty() const {
+        return m_vertices.empty();
+    }
 
     // -------------------------------------------------------------------------
     // Statistics  (population std-dev, divide by N)
     // -------------------------------------------------------------------------
     void calculateStatistics();
 
-    bool hasStatistics() const { return m_mu.has_value() && m_sigma.has_value(); }
+    bool hasStatistics() const {
+        return m_mu.has_value() && m_sigma.has_value();
+    }
 
-    double mu()    const { return m_mu.value_or(0.0); }
-    double sigma() const { return m_sigma.value_or(0.0); }
+    double mu() const {
+        return m_mu.value_or(0.0);
+    }
+    double sigma() const {
+        return m_sigma.value_or(0.0);
+    }
 
     std::pair<std::optional<double>, std::optional<double>> statisticsTuple() const {
         return {m_mu, m_sigma};
@@ -58,11 +70,15 @@ public:
     // -------------------------------------------------------------------------
     // Iteration helpers
     // -------------------------------------------------------------------------
-    auto begin() const { return m_vertices.begin(); }
-    auto end()   const { return m_vertices.end(); }
+    auto begin() const {
+        return m_vertices.begin();
+    }
+    auto end() const {
+        return m_vertices.end();
+    }
 
 private:
-    std::vector<VertexData>   m_vertices;
-    std::optional<double>     m_mu;
-    std::optional<double>     m_sigma;
+    std::vector<VertexData> m_vertices;
+    std::optional<double> m_mu;
+    std::optional<double> m_sigma;
 };
