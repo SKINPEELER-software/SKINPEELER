@@ -436,45 +436,9 @@ void CTImage::extractOuterShell()
 }
 
 // =============================================================================
-// calculateSingleInnerShell
-// Traverses incident edges of the last shell's vertices to find the next layer.
+// calculateInnerShellsAdaptive
+// Shell calculation using stored QuasiVertex references for traversal.
 // =============================================================================
-void CTImage::calculateSingleInnerShell()
-{
-    if (m_shells.empty() || !m_voronoi) return;
-
-    const CTShell& currentShell = m_shells.back();
-    CTShell newShell;
-
-    for (const auto& vdata : currentShell) {
-        // We need the QuasiVertex to call find_incident_quasi_edges().
-        // Problem: we stored plain VertexData, not QuasiVertex.
-        // Solution: the vertex visited-flag is set on the underlying VertexBU2D,
-        // so we look up vertices from the Voronoi object by traversing all beta
-        // vertices and matching by coordinate.
-        //
-        // However this would be O(N^2). Better solution used in practice:
-        // Store QuasiVertex objects while the VoronoiImpl is alive, and keep a
-        // parallel list alongside VertexData for traversal. This is handled via
-        // m_voronoi->pendingVertices populated during shell extraction.
-        (void)vdata; // see VoronoiImpl::pendingVertices below
-    }
-    // Actual traversal is done via stored QuasiVertex references — see below.
-    (void)newShell;
-}
-
-// =============================================================================
-// Inner shell implementation using stored QuasiVertex references
-// =============================================================================
-void CTImage::calculateInnerShells(int thickness)
-{
-    if (!m_voronoi) return;
-    for (int s = static_cast<int>(m_shells.size()); s < thickness; ++s)
-        calculateSingleInnerShell();
-}
-
-// Shell calculation with proper QuasiVertex tracking
-
 void CTImage::calculateInnerShellsAdaptive(bool maximize)
 {
     if (!m_voronoi) return;

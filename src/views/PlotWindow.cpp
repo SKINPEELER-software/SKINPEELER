@@ -1,5 +1,5 @@
 #include "PlotWindow.h"
-#include "AnalysisDialog.h"
+#include "PlotWidgets.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>

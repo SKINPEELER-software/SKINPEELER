@@ -1,7 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "SkinPeelerScene.h"
-#include "AnalysisDialog.h"
+#include "PlotWidgets.h"
 #include "PlotWindow.h"
 #include "services/DicomService.h"
 #include "services/PeelingService.h"

@@ -225,7 +225,7 @@ public:
     // Access raw DCMTK object for saving
     DcmFileFormat* dcmFileFormat() const { return m_fileFormat.get(); }
 
-    // Public: shell statistics for AnalysisDialog
+    // Public: shell statistics for the shell-analysis plot widgets
     std::vector<std::pair<double,double>>
         extractShellStatistics(bool excludeOutermost = EXCLUDE_OUTERMOST_SHELL) const;
 
@@ -239,8 +239,6 @@ private:
     // Shell calculation internals
     // -------------------------------------------------------------------------
     void extractOuterShell();
-    void calculateSingleInnerShell();
-    void calculateInnerShells(int thickness);
     void calculateInnerShellsAdaptive(bool maximize = false);
 
     // -------------------------------------------------------------------------

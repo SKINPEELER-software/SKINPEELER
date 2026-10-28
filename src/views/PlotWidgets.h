@@ -1,5 +1,4 @@
 #pragma once
-#include <QDialog>
 #include <QWidget>
 #include <QPainter>
 #include <vector>
@@ -179,20 +178,4 @@ private:
     ShellStats            m_stats;
     std::vector<double>   m_dists;   // inter-shell euclidean distances
     double                m_binSize  = 0.0;
-};
-
-// =============================================================================
-// AnalysisDialog
-//
-// Legacy single-window dialog kept for backward compatibility.
-// New code should use 3x PlotWindow instead.
-// =============================================================================
-class AnalysisDialog : public QDialog {
-    Q_OBJECT
-public:
-    using ShellStats = std::vector<std::pair<double,double>>;
-
-    explicit AnalysisDialog(const ShellStats& stats,
-                            int peelIndex,
-                            QWidget* parent = nullptr);
 };

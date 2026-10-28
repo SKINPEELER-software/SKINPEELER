@@ -1,7 +1,5 @@
-#include "AnalysisDialog.h"
+#include "PlotWidgets.h"
 
-#include <QVBoxLayout>
-#include <QScrollArea>
 #include <QPaintEvent>
 #include <QFont>
 #include <QFontMetrics>
@@ -801,27 +799,4 @@ void HistogramWidget::drawHistogram(QPainter& p) const
     // Place summary inside plot area (top-right)
     p.drawText(QRectF(area.right() - 305, area.top() + 8, 300, 18),
                Qt::AlignRight | Qt::AlignVCenter, summary);
-}
-
-// =============================================================================
-// AnalysisDialog  (legacy — kept for backward compatibility)
-// =============================================================================
-AnalysisDialog::AnalysisDialog(const ShellStats& stats, int peelIndex, QWidget* parent)
-    : QDialog(parent)
-{
-    setWindowTitle("Shell Analysis");
-    setMinimumSize(1200, 1700);
-    resize(1250, 1800);
-
-    auto* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(12, 12, 12, 12);
-    mainLayout->setSpacing(15);
-
-    auto* gaussPlot   = new GaussianPlotWidget(stats, peelIndex, peelIndex, this);
-    auto* scatterPlot = new ScatterPlotWidget(stats, peelIndex, peelIndex, this);
-    auto* histPlot    = new HistogramWidget(stats, this);
-
-    mainLayout->addWidget(gaussPlot,   1);
-    mainLayout->addWidget(scatterPlot, 1);
-    mainLayout->addWidget(histPlot,    1);
 }

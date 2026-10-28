@@ -184,7 +184,7 @@ set(SKINPEELER_GUI_SOURCES
     src/main.cpp
     src/views/MainWindow.cpp
     src/views/SkinPeelerScene.cpp
-    src/views/AnalysisDialog.cpp
+    src/views/PlotWidgets.cpp
     src/views/PlotWindow.cpp
 )
 
@@ -200,7 +200,7 @@ set(SKINPEELER_HEADERS
     src/utils/CoordinateTransform.h
     src/views/MainWindow.h
     src/views/SkinPeelerScene.h
-    src/views/AnalysisDialog.h
+    src/views/PlotWidgets.h
     src/views/PlotWindow.h
 )
 

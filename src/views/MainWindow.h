@@ -13,7 +13,7 @@
 #include <QCloseEvent>
 
 #include "models/CTImage.h"
-#include "views/AnalysisDialog.h"
+#include "views/PlotWidgets.h"
 #include "views/PlotWindow.h"
 
 QT_BEGIN_NAMESPACE
