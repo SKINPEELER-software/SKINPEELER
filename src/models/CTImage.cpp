@@ -768,6 +768,9 @@ int CTImage::calculateCuttingShell(CuttingAlgorithm algo)
             case CuttingAlgorithm::EUCLIDEAN:    return cuttingEuclideanDistance();
         }
     } catch (...) {
+        std::fprintf(stderr,
+            "CTImage::calculateCuttingShell: cutting algorithm %d threw, "
+            "falling back to Euclidean distance\n", static_cast<int>(algo));
         return cuttingEuclideanDistance();
     }
     return cuttingEuclideanDistance();

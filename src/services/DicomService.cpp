@@ -6,6 +6,7 @@
 #include <regex>
 
 #include <algorithm>
+#include <cstdio>
 #include <stdexcept>
 
 // =============================================================================
@@ -55,7 +56,8 @@ std::vector<std::unique_ptr<CTImage>> DicomService::loadDirectory(
                 std::make_unique<CTImage>(CTImage::fromDicomFile(path, beta, defaultThickness)));
         } catch (const std::exception& e) {
             // Skip invalid files (matching Python behaviour)
-            (void)e;
+            std::fprintf(stderr, "DicomService: skipping invalid file \"%s\": %s\n",
+                         path.c_str(), e.what());
         }
     }
 
@@ -121,7 +123,13 @@ int DicomService::saveDirectory(
             OFCondition status =
                 ff->saveFile(outPath.string().c_str(), EXS_LittleEndianExplicit);
             if (status.good()) ++saved;
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "DicomService: failed to save \"%s\": %s\n",
+                         img->filepath().c_str(), e.what());
+        } catch (...) {
+            std::fprintf(stderr, "DicomService: failed to save \"%s\": unknown error\n",
+                         img->filepath().c_str());
+        }
     }
     return saved;
 }

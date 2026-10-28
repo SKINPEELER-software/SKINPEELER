@@ -1,6 +1,7 @@
 #include "PeelingService.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 // =============================================================================
 // Auto mode
@@ -25,8 +26,10 @@ void PeelingService::peelAutoMode(
             img->setPeelIndex(std::max(0, img->peelIndex() + thicknessIncrement));
             img->peelSkin(region);
             img->releaseVoronoi();
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
             // Skip this slice, continue with the rest of the volume.
+            std::fprintf(stderr, "PeelingService::peelAutoMode: skipping slice \"%s\": %s\n",
+                         img->filepath().c_str(), e.what());
         }
 
         if (onProgress) onProgress(i + 1, total);
@@ -63,8 +66,10 @@ void PeelingService::peelUniformMode(
             img->setPeelIndex(t);
             img->peelSkin(region);
             img->releaseVoronoi();
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
             // Skip this slice, continue with the rest of the volume.
+            std::fprintf(stderr, "PeelingService::peelUniformMode: skipping slice \"%s\": %s\n",
+                         img->filepath().c_str(), e.what());
         }
 
         if (onProgress) onProgress(i + 1, total);
@@ -81,7 +86,9 @@ void PeelingService::halfPeelAutoMode(
     for (auto& img : images) {
         try {
             if (!img->hasShells()) img->calculateShells();
-        } catch (const std::exception&) {
+        } catch (const std::exception& e) {
+            std::fprintf(stderr, "PeelingService::halfPeelAutoMode: skipping slice \"%s\": %s\n",
+                         img->filepath().c_str(), e.what());
             continue;
         }
         img->setPeelIndex(std::max(0, img->peelIndex() + thicknessIncrement));

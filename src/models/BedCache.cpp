@@ -87,7 +87,13 @@ static std::vector<int> parseIntArray(const std::string& s) {
     while (std::getline(ss, token, ',')) {
         token = trim(token);
         if (!token.empty()) {
-            try { result.push_back(std::stoi(token)); } catch (...) {}
+            try {
+                result.push_back(std::stoi(token));
+            } catch (...) {
+                std::fprintf(stderr,
+                    "BedCache: skipping malformed integer token in cache file: \"%s\"\n",
+                    token.c_str());
+            }
         }
     }
     return result;
@@ -125,7 +131,12 @@ static bool parseNumberValue(const std::string& line, const std::string& key,
         size_t consumed = 0;
         out = std::stod(line.substr(numStart), &consumed);
         return consumed > 0;
-    } catch (...) { return false; }
+    } catch (...) {
+        std::fprintf(stderr,
+            "BedCache: skipping malformed number for key \"%s\" in cache file\n",
+            key.c_str());
+        return false;
+    }
 }
 
 static bool parseIntValue(const std::string& line, const std::string& key,
