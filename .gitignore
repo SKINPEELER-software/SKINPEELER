@@ -1,0 +1,25 @@
+# Build output
+build/
+build_*/
+out/
+
+# IDE / editor
+.vscode/
+.idea/
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (not intended for this repository)
+data/
+*.dcm
+
+# Compiled binaries
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+compile_commands.json
