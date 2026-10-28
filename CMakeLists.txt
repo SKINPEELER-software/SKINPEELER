@@ -24,6 +24,10 @@ project(SKINPEELER VERSION 2.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Unit tests (GoogleTest via FetchContent, see tests/CMakeLists.txt).
+# Default ON — set -DBUILD_TESTING=OFF to skip (e.g. a minimal/offline build).
+option(BUILD_TESTING "Build SKINPEELER unit tests (GoogleTest via FetchContent)" ON)
+
 # Qt auto-generation
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
@@ -272,3 +276,11 @@ install(TARGETS SKINPEELER DESTINATION bin)
 #       COMMAND "${QT_DEPLOY_TOOL}" $<TARGET_FILE:SKINPEELER>)
 # windeployqt itself is not invoked here since it requires a Windows/Qt
 # environment not assumed to be present on every build machine.
+
+# =============================================================================
+# Unit tests (GoogleTest + CTest)
+# =============================================================================
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
