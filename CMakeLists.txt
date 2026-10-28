@@ -209,6 +209,7 @@ add_executable(SKINPEELER
     ${SKINPEELER_GUI_SOURCES}
     ${SKINPEELER_HEADERS}
     src/views/MainWindow.ui
+    assets/resources.qrc
 )
 
 target_include_directories(SKINPEELER PRIVATE

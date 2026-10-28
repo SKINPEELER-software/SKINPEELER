@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+  <rect x="0" y="0" width="1000" height="1000" rx="140" fill="#12161c"/>
+  <clipPath id="roundedClip"><rect x="0" y="0" width="1000" height="1000" rx="140"/></clipPath>
+  <g clip-path="url(#roundedClip)">
+    <polygon points="706.2,657.1 758.4,842.0 468.7,832.8 478.7,696.0 651.8,635.3" fill="#1e3a5f" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="581.6,395.4 535.0,356.9 510.9,142.8 527.5,0.0 1000.0,0.0 1000.0,358.5" fill="#265078" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="260.1,628.6 194.2,1000.0 408.8,1000.0 468.7,832.8 478.7,696.0 357.0,618.3" fill="#18646e" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="260.1,628.6 194.2,1000.0 0.0,1000.0 0.0,456.0" fill="#2e788c" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="1000.0,358.5 581.6,395.4 651.8,635.3 706.2,657.1 1000.0,477.5" fill="#144664" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="535.0,356.9 440.4,426.2 216.2,361.5 510.9,142.8" fill="#375f82" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="0.0,456.0 0.0,456.0 260.1,628.6 357.0,618.3 440.4,426.2 216.2,361.5 0.0,391.5" fill="#216e78" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="651.8,635.3 478.7,696.0 357.0,618.3 440.4,426.2 535.0,356.9 581.6,395.4" fill="#d6603a" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="706.2,657.1 758.4,842.0 841.5,1000.0 1000.0,1000.0 1000.0,477.5" fill="#1c5a80" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="468.7,832.8 408.8,1000.0 841.5,1000.0 758.4,842.0" fill="#306973" stroke="#e6ecf0" stroke-width="6"/>
+    <polygon points="510.9,142.8 216.2,361.5 0.0,391.5 0.0,0.0 527.5,0.0" fill="#244a6c" stroke="#e6ecf0" stroke-width="6"/>
+  </g>
+  <rect x="0" y="0" width="1000" height="1000" rx="140" fill="none" stroke="#0a0d11" stroke-width="10"/>
+</svg>
