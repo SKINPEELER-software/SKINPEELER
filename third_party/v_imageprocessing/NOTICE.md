@@ -2,23 +2,30 @@
 
 This directory bundles a **prebuilt static library** (`lib/linux-x86_64/libV_2D.a`)
 and its public C++ headers (`include/`) for **V-ImageProcessing**, a computational
-geometry library (Voronoi diagram / beta-complex construction) developed and
-owned by the **Voronoi Diagram Research Center, Hanyang University**.
+geometry library (Voronoi diagram / beta-complex construction) that is
+**proprietary software owned and developed by the Voronoi Diagram Research
+Center (VDRC), Hanyang University**.
 
 ## Status
 
-- The library source code is **proprietary** and is **not** included in this
-  repository. Only the headers required to compile against the library, and a
-  prebuilt binary artifact, are provided here so that SKINPEELER can be built
-  end-to-end without access to the private source repository.
-- This binary/header bundle is **not covered by the MIT license** that applies
-  to the rest of this repository (see top-level `LICENSE`). All rights to
-  V-ImageProcessing remain with the Voronoi Diagram Research Center.
-- Redistribution terms for this binary are being confirmed with the research
-  center. **This notice is a draft pending that confirmation** — do not treat
-  the mere presence of the binary in this repository as a redistribution
-  grant. If you are affiliated with the research center and have concerns
-  about this bundling, please contact the repository owner.
+- The library's source code is **not** included in this repository and
+  remains private to VDRC. Only the public headers required to compile
+  against the library, and a prebuilt binary artifact, are bundled here —
+  with the research center's permission — so that SKINPEELER can be built
+  and run end-to-end without access to the private source repository.
+- This binary/header bundle is **not covered by the MIT license** that
+  applies to the rest of this repository (see top-level `LICENSE`). All
+  rights to V-ImageProcessing remain with the Voronoi Diagram Research
+  Center, Hanyang University.
+- Redistribution of this prebuilt binary and these headers alongside
+  SKINPEELER has been authorized by the research center for the specific
+  purpose of allowing SKINPEELER to be built and used. This authorization
+  does not extend to the library's source code, to independent
+  redistribution of this bundle outside of the SKINPEELER project, or to
+  any other use of V-ImageProcessing on its own.
+- For access to the V-ImageProcessing source, licensing beyond the scope
+  above, or any other questions about this library, please contact the
+  Voronoi Diagram Research Center, Hanyang University directly.
 
 ## Platform coverage
 
