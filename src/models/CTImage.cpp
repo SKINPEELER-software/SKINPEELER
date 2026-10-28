@@ -16,6 +16,9 @@
 // BedDetector + cache
 #include "BedCache.h"
 
+// Pure cutting-statistics math (S1 extraction — no CTImage/V-IP/DCMTK dependency)
+#include "ShellStatistics.h"
+
 #include "utils/CoordinateTransform.h"
 
 #include <algorithm>
@@ -262,6 +265,37 @@ void CTImage::setBeta(double b)
 }
 
 // =============================================================================
+// buildAndClassifyVoronoi  — shared Voronoi-construction step (S2)
+//
+// Common to calculateShells() and computeBiggestComponentMask(): transpose
+// image to column-major, read BitsStored, constructForImageProcessing16bit,
+// set_beta_value, classifyByComponents. Allocates m_voronoi.
+// =============================================================================
+void CTImage::buildAndClassifyVoronoi()
+{
+    m_voronoi = std::make_unique<VoronoiImpl>();
+    V::ImageProcessingBC& bc = m_voronoi->bc;
+
+    // Transpose image to column-major for the C++ library
+    std::vector<std::vector<int>> colorDataSet(
+        m_width, std::vector<int>(m_height));
+    for (int r = 0; r < m_height; ++r)
+        for (int c = 0; c < m_width; ++c)
+            colorDataSet[c][r] = static_cast<int>(m_image[r * m_width + c]);
+
+    // Read BitsStored from DICOM — required for correct 16-bit → 8-bit scaling
+    // Python V1 ct.py: construct_for_Image_Processing_16bit(colorDataSet, bits_stored, ...)
+    Uint16 bitsStored = 16;
+    if (m_fileFormat && m_fileFormat->getDataset())
+        m_fileFormat->getDataset()->findAndGetUint16(DCM_BitsStored, bitsStored);
+    const int bitsStoredInt = static_cast<int>(bitsStored);
+
+    bc.constructForImageProcessing16bit(colorDataSet, bitsStoredInt, DARKER_PIXEL_BIGGER_DISK);
+    bc.set_beta_value(m_beta);
+    bc.classifyByComponents();
+}
+
+// =============================================================================
 // calculateShells  — main entry point for Voronoi + shell extraction
 // Always extracts all reachable shells (maximize mode). See CTImage.h for rationale.
 // =============================================================================
@@ -269,27 +303,9 @@ void CTImage::calculateShells()
 {
     m_timedOut = false;
     try {
-        // Build Voronoi / beta-complex
-        m_voronoi = std::make_unique<VoronoiImpl>();
+        // Build Voronoi / beta-complex (shared with computeBiggestComponentMask())
+        buildAndClassifyVoronoi();
         V::ImageProcessingBC& bc = m_voronoi->bc;
-
-        // Transpose image to column-major for the C++ library
-        std::vector<std::vector<int>> colorDataSet(
-            m_width, std::vector<int>(m_height));
-        for (int r = 0; r < m_height; ++r)
-            for (int c = 0; c < m_width; ++c)
-                colorDataSet[c][r] = static_cast<int>(m_image[r * m_width + c]);
-
-        // Read BitsStored from DICOM — required for correct 16-bit → 8-bit scaling
-        // Python V1 ct.py: construct_for_Image_Processing_16bit(colorDataSet, bits_stored, ...)
-        Uint16 bitsStored = 16;
-        if (m_fileFormat && m_fileFormat->getDataset())
-            m_fileFormat->getDataset()->findAndGetUint16(DCM_BitsStored, bitsStored);
-        const int bitsStoredInt = static_cast<int>(bitsStored);
-
-        bc.constructForImageProcessing16bit(colorDataSet, bitsStoredInt, DARKER_PIXEL_BIGGER_DISK);
-        bc.set_beta_value(m_beta);
-        bc.classifyByComponents();
 
         m_shells.clear();
         extractOuterShell();
@@ -564,10 +580,10 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize)
             double cov[2][2] = {{c00/div, c01/div}, {c01/div, c11/div}};
             double inv[2][2];
 
-            if (invert2x2(cov, inv)) {
+            if (ShellStatistics::invert2x2(cov, inv)) {
                 const auto& [lmu, lsig] = statsPoints.back();
                 double diff[2] = {lmu - meanMu, lsig - meanSigma};
-                double mahal = mahalanobis2D(diff, inv);
+                double mahal = ShellStatistics::mahalanobis2D(diff, inv);
 
                 if (!maximize) {
                     if (mahal <= SIGMA_THRESHOLD) {
@@ -696,27 +712,11 @@ std::vector<char> CTImage::extractComponentMaskById(int component_id)
 // =============================================================================
 std::vector<char> CTImage::computeBiggestComponentMask()
 {
-    // Build Voronoi / beta-complex (same as calculateShells start)
-    m_voronoi = std::make_unique<VoronoiImpl>();
-    V::ImageProcessingBC& bc = m_voronoi->bc;
-
-    // Transpose image to column-major (required by V library)
-    std::vector<std::vector<int>> colorDataSet(
-        m_width, std::vector<int>(m_height));
-    for (int r = 0; r < m_height; ++r)
-        for (int c = 0; c < m_width; ++c)
-            colorDataSet[c][r] = static_cast<int>(m_image[r * m_width + c]);
-
-    // Read BitsStored (same logic as calculateShells)
-    Uint16 bitsStored = 16;
-    if (m_fileFormat && m_fileFormat->getDataset())
-        m_fileFormat->getDataset()->findAndGetUint16(DCM_BitsStored, bitsStored);
-    const int bitsStoredInt = static_cast<int>(bitsStored);
-
     try {
-        bc.constructForImageProcessing16bit(colorDataSet, bitsStoredInt, DARKER_PIXEL_BIGGER_DISK);
-        bc.set_beta_value(m_beta);
-        bc.classifyByComponents();
+        // Build Voronoi / beta-complex (shared with calculateShells())
+        buildAndClassifyVoronoi();
+        V::ImageProcessingBC& bc = m_voronoi->bc;
+
         bc.select_biggest_componentBSFace();
 
         // Build H*W pixel mask
@@ -792,43 +792,17 @@ CTImage::extractShellStatistics(bool excludeOutermost) const
     return pts;
 }
 
+// =============================================================================
+// Cutting algorithms — thin delegation wrappers.
+// Shell-statistics extraction (member, has the m_doNotChangeThickness side
+// effect) + per-shell bookkeeping (m_shellMahalD/m_shellInside) stay here;
+// the actual math is in ShellStatistics (S1 extraction).
+// =============================================================================
 int CTImage::cuttingEuclideanDistance()
 {
     auto points = extractShellStatistics();
-    if (points.empty()) return 0;
-
-    double maxDist  = -1.0;
-    int    maxIndex = 0;
-
-    for (int i = 0; i + 1 < static_cast<int>(points.size()); ++i) {
-        double dmu    = points[i+1].first  - points[i].first;
-        double dsigma = points[i+1].second - points[i].second;
-        double dist   = std::sqrt(dmu*dmu + dsigma*dsigma);
-        if (dist > maxDist) {
-            maxDist  = dist;
-            maxIndex = i;
-        }
-    }
-
-    return maxIndex + (EXCLUDE_OUTERMOST_SHELL ? 1 : 0);
-}
-
-bool CTImage::invert2x2(const double cov[2][2], double inv[2][2])
-{
-    double det = cov[0][0]*cov[1][1] - cov[0][1]*cov[1][0];
-    if (std::abs(det) < 1e-10) return false;
-    inv[0][0] =  cov[1][1] / det;
-    inv[0][1] = -cov[0][1] / det;
-    inv[1][0] = -cov[1][0] / det;
-    inv[1][1] =  cov[0][0] / det;
-    return true;
-}
-
-double CTImage::mahalanobis2D(const double diff[2], const double inv[2][2])
-{
-    double t0 = inv[0][0]*diff[0] + inv[0][1]*diff[1];
-    double t1 = inv[1][0]*diff[0] + inv[1][1]*diff[1];
-    return std::sqrt(diff[0]*t0 + diff[1]*t1);
+    const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
+    return ShellStatistics::cuttingEuclideanDistance(points, offset);
 }
 
 int CTImage::cutting3SigmaDistance()
@@ -840,79 +814,27 @@ int CTImage::cutting3SigmaDistance()
     m_shellMahalD.assign(nShells, -1.0);
     m_shellInside.assign(nShells, false);
 
-    if (static_cast<int>(points.size()) < 4) return cuttingEuclideanDistance();
+    const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
+    auto result = ShellStatistics::cutting3SigmaDistance(
+        points, offset, SIGMA_THRESHOLD, DISTANCE_JUMP_SIGMA);
 
-    const double np = static_cast<double>(points.size());
-    double meanMu = 0, meanSigma = 0;
-    for (auto& [mu, sigma] : points) { meanMu += mu; meanSigma += sigma; }
-    meanMu /= np; meanSigma /= np;
-
-    // Sample covariance (N-1) to match np.cov
-    double c00 = 0, c01 = 0, c11 = 0;
-    for (auto& [mu, sigma] : points) {
-        double dm = mu - meanMu, ds = sigma - meanSigma;
-        c00 += dm*dm; c01 += dm*ds; c11 += ds*ds;
+    if (!result.computed) {
+        // points.size() < 4, or singular covariance — same fallback as before.
+        return cuttingEuclideanDistance();
     }
-    double div = np - 1.0;
-    double cov[2][2] = {{c00/div, c01/div}, {c01/div, c11/div}};
-    double inv[2][2];
 
-    if (!invert2x2(cov, inv)) return cuttingEuclideanDistance();
-
-    std::vector<bool> inside(points.size());
-    for (int i = 0; i < static_cast<int>(points.size()); ++i) {
-        double diff[2] = {points[i].first - meanMu, points[i].second - meanSigma};
-        double d = mahalanobis2D(diff, inv);
-        inside[i] = (d <= SIGMA_THRESHOLD);
-
-        // Store in per-shell vectors.
-        // points[i] corresponds to m_shells[i + offset] where offset = 1 if EXCLUDE_OUTERMOST.
-        int shellIdx = i + (EXCLUDE_OUTERMOST_SHELL ? 1 : 0);
+    // Store per-point Mahalanobis distance/inside flag into per-shell vectors.
+    // points[i] corresponds to m_shells[i + offset].
+    for (int i = 0; i < static_cast<int>(result.mahalDistances.size()); ++i) {
+        int shellIdx = i + offset;
         if (shellIdx < nShells) {
-            m_shellMahalD[shellIdx] = d;
-            m_shellInside[shellIdx] = inside[i];
+            m_shellMahalD[shellIdx] = result.mahalDistances[i];
+            m_shellInside[shellIdx] = result.inside[i];
         }
     }
     // shell[0] stays at default: mahal=-1, inside=false
 
-    const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
-
-    for (int i = 0; i < static_cast<int>(inside.size()); ++i) {
-        if (inside[i]) {
-            if (i == 0) return findDistanceJump(points);
-            return (i - 1) + offset;
-        }
-    }
-    // All outside → distance jump
-    return findDistanceJump(points);
-}
-
-int CTImage::findDistanceJump(const std::vector<std::pair<double,double>>& points)
-{
-    if (points.size() < 2) return 0;
-
-    std::vector<double> dists;
-    for (int i = 0; i + 1 < static_cast<int>(points.size()); ++i) {
-        double dmu = points[i+1].first - points[i].first;
-        double ds  = points[i+1].second - points[i].second;
-        dists.push_back(std::sqrt(dmu*dmu + ds*ds));
-    }
-
-    double dmean = 0;
-    for (double d : dists) dmean += d;
-    dmean /= static_cast<double>(dists.size());
-
-    double dvar = 0;
-    for (double d : dists) dvar += (d-dmean)*(d-dmean);
-    double dstd = std::sqrt(dvar / static_cast<double>(dists.size()));
-
-    double threshold = dmean + DISTANCE_JUMP_SIGMA * dstd;
-    int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
-
-    for (int i = 0; i < static_cast<int>(dists.size()); ++i) {
-        if (dists[i] > threshold) return i + offset;
-    }
-    return EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
+    return result.cuttingIndex;
 }
 
 int CTImage::cuttingGmmSequential()

@@ -238,21 +238,29 @@ private:
     // -------------------------------------------------------------------------
     // Shell calculation internals
     // -------------------------------------------------------------------------
+
+    // Shared Voronoi-construction step used by both calculateShells() and
+    // computeBiggestComponentMask(): transpose image to column-major, read
+    // BitsStored, constructForImageProcessing16bit, set_beta_value,
+    // classifyByComponents. Allocates m_voronoi.
+    void buildAndClassifyVoronoi();
+
     void extractOuterShell();
     void calculateInnerShellsAdaptive(bool maximize = false);
 
     // -------------------------------------------------------------------------
     // Cutting point detection (V2 algorithms)
+    //
+    // The pure math (covariance inversion, Mahalanobis distance, 3-sigma
+    // ellipse test, distance-jump detection) lives in ShellStatistics
+    // (models/ShellStatistics.h) as free functions over plain (mu, sigma)
+    // values -- these methods just extract the shell statistics, delegate,
+    // and store the per-shell bookkeeping (m_shellMahalD/m_shellInside).
     // -------------------------------------------------------------------------
     int calculateCuttingShell(CuttingAlgorithm algo = DEFAULT_CUTTING_ALGORITHM);
     int cuttingEuclideanDistance();
     int cutting3SigmaDistance();
     int cuttingGmmSequential();   // stub → falls back to Euclidean
-    int findDistanceJump(const std::vector<std::pair<double,double>>& points);
-
-    // 2×2 covariance inverse for Mahalanobis distance (no external lib)
-    static bool invert2x2(const double cov[2][2], double inv[2][2]);
-    static double mahalanobis2D(const double diff[2], const double inv[2][2]);
 
     // -------------------------------------------------------------------------
     // Data members

@@ -172,6 +172,7 @@ set(DCMJPEG_LIBS ${DCMJPEG_LIB} ${IJG8_LIB} ${IJG12_LIB} ${IJG16_LIB})
 # =============================================================================
 set(SKINPEELER_ENGINE_SOURCES
     src/models/CTShell.cpp
+    src/models/ShellStatistics.cpp
     src/models/CTImage.cpp
     src/models/BedDetector.cpp
     src/models/BedCache.cpp
@@ -191,6 +192,7 @@ set(SKINPEELER_GUI_SOURCES
 set(SKINPEELER_HEADERS
     src/config/Settings.h
     src/models/CTShell.h
+    src/models/ShellStatistics.h
     src/models/CTImage.h
     src/models/BedDetector.h
     src/models/BedCache.h
