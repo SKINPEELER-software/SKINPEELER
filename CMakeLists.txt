@@ -17,7 +17,7 @@ project(SKINPEELER VERSION 2.0 LANGUAGES CXX)
 #   source checkout (lab-internal use only; see below).
 #
 # Internal/lab build (private source checkout available):
-#   cmake -B build -DV_IP_SOURCE_ROOT=/path/to/PyMGOS/dev_vdrc/src/V
+#   cmake -B build -DV_IP_SOURCE_ROOT=/path/to/V-ImageProcessing/src/V
 #
 # =============================================================================
 
@@ -39,7 +39,7 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_SOURCE_DIR}/src/views")
 # =============================================================================
 if(DEFINED V_IP_SOURCE_ROOT)
     # ---- Lab-internal source build -----------------------------------------
-    # Not for public use: requires a private V-ImageProcessing (PyMGOS) source
+    # Not for public use: requires a private V-ImageProcessing source
     # checkout. Mirrors the source-tree layout of that checkout.
     message(STATUS "SKINPEELER: building V-ImageProcessing from source at ${V_IP_SOURCE_ROOT}")
 
@@ -127,7 +127,7 @@ else()
             "${V_IP_LIB}. On Windows this is expected (not yet bundled — "
             "see third_party/v_imageprocessing/NOTICE.md). Either obtain a "
             "prebuilt library for your platform, or (lab-internal) pass "
-            "-DV_IP_SOURCE_ROOT=<path-to-PyMGOS-V-checkout> to build from "
+            "-DV_IP_SOURCE_ROOT=<path-to-V-ImageProcessing-source-checkout> to build from "
             "source.")
     endif()
 

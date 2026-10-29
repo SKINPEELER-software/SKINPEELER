@@ -2,8 +2,7 @@
 
 **Voronoi diagram–based boundary segmentation for biological CT, as a C++17 / Qt desktop application.**
 
-<!-- Replace <OWNER>/<REPO> below with this repository's actual GitHub path once pushed. -->
-[![CI](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/ci.yml)
+[![CI](https://github.com/SKINPEELER-software/SKINPEELER/actions/workflows/ci.yml/badge.svg)](https://github.com/SKINPEELER-software/SKINPEELER/actions/workflows/ci.yml)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=c%2B%2B&logoColor=white)
 ![Qt6](https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -21,6 +20,20 @@ SKINPEELER segments the high-density outer boundary of a biological specimen
 iterative Voronoi-diagram shell-peeling algorithm. The engine is a
 standalone C++17 library; this repository wraps it in a Qt 6 desktop GUI for
 interactive use.
+
+## Download
+
+Most users just want to run the application — grab the prebuilt Windows
+executable from the **[v1.0 release](https://github.com/SKINPEELER-software/SKINPEELER/releases/tag/v1.0)**
+(no build step required). A v2.0 release with the current source-tree
+feature set (whole-volume "Peel All" with a progress bar and cancel
+support, etc.) is planned.
+
+After downloading, see [`Manual.md`](Manual.md) for how to use the
+application.
+
+If you want to build from source (Linux, or Windows via source), or modify
+the code, continue reading below.
 
 ## Research
 
@@ -174,6 +187,19 @@ python3 tools/make_phantom.py -o sample_data/phantom -n 8
 See [`sample_data/README.md`](sample_data/README.md) for details on what
 the phantom contains.
 
+### Try it on a real CT series
+
+`data/test/` bundles a small real CT slice series alongside the SKINPEELER
+output for it, as a worked example:
+
+- `data/test/original/` — 8 input DICOM slices
+- `data/test/peeled/` — the corresponding `peeled-*.dcm` output
+
+```bash
+./build/SKINPEELER
+# File -> Open DICOM Directory -> data/test/original
+```
+
 ## Tests & CI
 
 ```bash
@@ -194,6 +220,7 @@ clang-format compliance check on every push/PR to `main`.
 ```
 SKINPEELER/
 ├── CMakeLists.txt
+├── Manual.md       # End-user manual (v1.0 executable)
 ├── src/
 │   ├── models/     # Engine: CTImage, CTShell, BedDetector, BedCache, ShellStatistics
 │   ├── services/    # Engine: DicomService, PeelingService, StatisticsService
@@ -203,6 +230,7 @@ SKINPEELER/
 ├── cli/            # Standalone experiment CLI tools (no Qt dependency)
 ├── tests/          # GoogleTest + CTest suite
 ├── sample_data/     # Synthetic phantom DICOM series + generator notes
+├── data/test/      # Worked example: a real CT slice series + its SKINPEELER output
 ├── tools/          # make_phantom.py (phantom generator)
 ├── third_party/
 │   └── v_imageprocessing/  # Prebuilt V-ImageProcessing library + public headers

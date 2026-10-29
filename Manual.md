@@ -1,5 +1,12 @@
 # SKINPEELER v1.0 Manual
 
+> This manual describes the **v1.0** prebuilt Windows executable (see
+> [Releases](https://github.com/SKINPEELER-software/SKINPEELER/releases)).
+> The current source-tree build adds a few features not covered below,
+> including a progress bar and cancel button for whole-volume ("Peel All")
+> peeling. Building from source is described in the top-level
+> [`README.md`](README.md).
+
 ## 1. Open File
 
 1) Click the [Open DICOM] button to select the folder containing the Dicom File(.dcm) you want to peel.

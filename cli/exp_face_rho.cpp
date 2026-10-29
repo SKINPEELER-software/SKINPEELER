@@ -16,7 +16,7 @@
 //   {prefix}_exceed_map_{idx}.bin    — 511×511×2 uint8 exceed maps
 //
 // Architecture: SKINPEELER Engine layer — no Qt dependency.
-// PyMGOS API is NOT called; formulas are re-implemented as static helpers.
+// V-ImageProcessing API is NOT called; formulas are re-implemented as static helpers.
 // =============================================================================
 
 #include <iostream>
@@ -97,7 +97,7 @@ static void normalizeIntensities(vector<unique_ptr<CTImage>>& images)
 }
 
 // =============================================================================
-// Re-implementation of BetaUniverse2D formulas (PyMGOS API not called)
+// Re-implementation of BetaUniverse2D formulas (V-ImageProcessing API not called)
 // =============================================================================
 
 // calculateRadiusOfPixel  (BetaUniverse2D.cpp:1779-1782)

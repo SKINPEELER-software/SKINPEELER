@@ -40,5 +40,5 @@ Center (VDRC), Hanyang University**.
 
 See the top-level `CMakeLists.txt`: by default it links the prebuilt static
 library in this directory. An internal/lab build can instead point
-`-DV_IP_SOURCE_ROOT=<path-to-PyMGOS-checkout>` at a private source checkout to
+`-DV_IP_SOURCE_ROOT=<path-to-source-checkout>` at a private source checkout to
 build V-ImageProcessing from source.
