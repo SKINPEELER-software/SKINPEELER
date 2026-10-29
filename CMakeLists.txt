@@ -162,14 +162,25 @@ endif()
 # =============================================================================
 find_package(DCMTK REQUIRED)
 
-# JPEG Lossless codec libraries (Transfer Syntax 1.2.840.10008.1.2.4.70),
-# required by DJDecoderRegistration::registerCodecs() in CTImage.cpp.
-# Ship with libdcmtk-dev on Debian/Ubuntu.
-find_library(DCMJPEG_LIB dcmjpeg REQUIRED)
-find_library(IJG8_LIB    ijg8    REQUIRED)
-find_library(IJG12_LIB   ijg12   REQUIRED)
-find_library(IJG16_LIB   ijg16   REQUIRED)
-set(DCMJPEG_LIBS ${DCMJPEG_LIB} ${IJG8_LIB} ${IJG12_LIB} ${IJG16_LIB})
+# Resolve every DCMTK library to a full path with find_library instead of
+# relying on ${DCMTK_LINK_LIBS}: some DCMTK CMake configs (notably vcpkg's)
+# return bare names there, which the MSVC linker cannot resolve (LNK1181).
+# Works identically on Linux (libdcmtk-dev) and Windows (vcpkg dcmtk).
+# dcmjpeg/ijg* are the JPEG Lossless codecs (Transfer Syntax
+# 1.2.840.10008.1.2.4.70) required by DJDecoderRegistration::registerCodecs().
+find_library(DCMDATA_LIB  dcmdata  REQUIRED)
+find_library(DCMIMGLE_LIB dcmimgle REQUIRED)
+find_library(OFSTD_LIB    ofstd    REQUIRED)
+find_library(OFLOG_LIB    oflog    REQUIRED)
+find_library(DCMJPEG_LIB  dcmjpeg  REQUIRED)
+find_library(IJG8_LIB     ijg8     REQUIRED)
+find_library(IJG12_LIB    ijg12    REQUIRED)
+find_library(IJG16_LIB    ijg16    REQUIRED)
+set(DCMTK_LINK_LIBS
+    ${DCMJPEG_LIB} ${DCMIMGLE_LIB} ${DCMDATA_LIB}
+    ${IJG8_LIB} ${IJG12_LIB} ${IJG16_LIB}
+    ${OFLOG_LIB} ${OFSTD_LIB})
+set(DCMJPEG_LIBS "")  # merged into DCMTK_LINK_LIBS above
 
 # =============================================================================
 # SKINPEELER engine + GUI sources (explicit list — no GLOB)
@@ -226,8 +237,7 @@ target_include_directories(SKINPEELER PRIVATE
 target_link_libraries(SKINPEELER PRIVATE
     ${V_IMAGEPROCESSING_TARGET}
     ${QT_LIBS}
-    ${DCMTK_LIBRARIES}
-    ${DCMJPEG_LIBS}
+    ${DCMTK_LINK_LIBS}
 )
 
 if(WIN32)
@@ -249,8 +259,7 @@ function(add_skinpeeler_cli name)
     )
     target_link_libraries(${name} PRIVATE
         ${V_IMAGEPROCESSING_TARGET}
-        ${DCMTK_LIBRARIES}
-        ${DCMJPEG_LIBS}
+        ${DCMTK_LINK_LIBS}
     )
     if(WIN32)
         target_compile_definitions(${name} PRIVATE _USE_MATH_DEFINES NOMINMAX)
