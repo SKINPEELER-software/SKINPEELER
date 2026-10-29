@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <cmath>
 #include <vector>
+#include <array>
 #include <string>
 #include <algorithm>
 #include <numeric>
