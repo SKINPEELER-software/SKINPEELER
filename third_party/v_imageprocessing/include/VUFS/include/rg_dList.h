@@ -74,8 +74,10 @@
 #define _RG_DLIST_H
 
 #include <stdlib.h>
+#include <new>
 #include "rg_Const.h"
-//  Node for Double linked list class using template 
+#include "rg_BlockArena.h"
+//  Node for Double linked list class using template
 template <class T>
 class rg_dList;
 
@@ -116,21 +118,50 @@ class rg_dList
 {
 protected:
     rg_dNode<T> *head;
-    rg_dNode<T> *tail; 
+    rg_dNode<T> *tail;
     // revised by Y.Cho (2010.4.3)
     mutable rg_dNode<T> *current;
     //rg_dNode<T> *current;
 
     rg_INDEX size;
-    
+
+    // ---------------------------------------------------------------
+    // Optional node allocator (perf/2a-lite, 2026-10-29).
+    //
+    // Default is rg_NULL, which preserves the ORIGINAL behavior of this
+    // class exactly: every node comes from plain `new rg_dNode<T>()` and
+    // goes back via plain `delete`.
+    //
+    // If setArena() is called with a non-null rg_BlockArena*, add()-family
+    // calls place nodes into arena-provided memory instead (bump pointer,
+    // no per-node malloc), and removeAll()/kill()-family calls run the
+    // node's destructor in place WITHOUT returning its memory to the
+    // allocator -- the arena reclaims everything in one shot when its
+    // owner calls rg_BlockArena::reset() (or when the arena itself is
+    // destroyed). This trades per-node free for bulk free, which is only
+    // safe for lists whose entire memory is torn down together (i.e. no
+    // other, still-alive node needs that memory back in between).
+    //
+    // setArena() MUST be called immediately after construction, before
+    // the first add()/addHead()/addTail()/... call -- switching
+    // allocators on a list that already owns nodes is unsupported.
+    // -----------------------------------------------------------------
+    rg_BlockArena* m_arena;
+
+    rg_dNode<T>* allocateNode();
+    void         deallocateNode(rg_dNode<T>* node);
+
 public:
 
 //// constructor & destructor  /////////////////////////////
-    
+
     rg_dList();
     rg_dList(const T& etemp);
     rg_dList(const rg_dList<T>& thisList);
     virtual ~rg_dList();
+
+    // See m_arena above for the usage contract.
+    void setArena(rg_BlockArena* arena) { m_arena = arena; }
 
 
 //// functions to add or delete entities //////////////////
@@ -386,6 +417,33 @@ void rg_dNode<T>::setEntity(const T& input)
 //  implementation of Double linked list class using template  //
 /////////////////////////////////////////////////////////////////
 
+// perf/2a-lite (2026-10-29): node allocation/deallocation funnel through
+// these two helpers so every add()-family / kill()-family function gets
+// arena support for free, while the m_arena==rg_NULL (default) path is
+// byte-for-byte the original `new rg_dNode<T>()` / `delete node;`.
+template<class T>
+rg_dNode<T>* rg_dList<T>::allocateNode()
+{
+    if ( m_arena != rg_NULL ) {
+        void* mem = m_arena->allocate(sizeof(rg_dNode<T>));
+        return new (mem) rg_dNode<T>();
+    }
+    return new rg_dNode<T>();
+}
+
+template<class T>
+void rg_dList<T>::deallocateNode(rg_dNode<T>* node)
+{
+    if ( m_arena != rg_NULL ) {
+        // Memory is owned by the arena and reclaimed in bulk later --
+        // only run the destructor (entity teardown) here.
+        node->~rg_dNode<T>();
+    }
+    else {
+        delete node;
+    }
+}
+
 template<class T>
 void rg_dList<T>::removeAll()
 {
@@ -394,7 +452,7 @@ void rg_dList<T>::removeAll()
     while( size > 0 )
     {
         nextNode=currentNode->getNext();
-        delete currentNode;
+        deallocateNode(currentNode);
         currentNode=nextNode;
         size--;
     }
@@ -413,11 +471,13 @@ rg_dList<T>::rg_dList()
     tail=rg_NULL;
     size=0;
     current=rg_NULL;
+    m_arena=rg_NULL;
 }
 
 template<class T>
 rg_dList<T>::rg_dList(const T& etemp)
 {
+    m_arena=rg_NULL;
     head=new rg_dNode<T>();
     head->entity=etemp;
     head->prev=head;
@@ -434,6 +494,7 @@ rg_dList<T>::rg_dList(const rg_dList<T>& thisList)
     tail=rg_NULL;
     size=0;
     current=rg_NULL;
+    m_arena=rg_NULL;
     duplicateList(thisList);
 }
 
@@ -456,7 +517,7 @@ T* rg_dList<T>::addTail(const T& etemp)
     rg_dNode<T> *newNode=rg_NULL;
     if ( size == 0 )
     {
-        newNode=new rg_dNode<T>();
+        newNode=allocateNode();
         newNode->next=newNode;
         newNode->prev=newNode;
         newNode->entity=etemp;
@@ -469,7 +530,7 @@ T* rg_dList<T>::addTail(const T& etemp)
         rg_dNode<T> *preNode=tail;
         rg_dNode<T> *nextNode=head;
 
-        newNode=new rg_dNode<T>();
+        newNode=allocateNode();
         newNode->prev=preNode;
         newNode->next=nextNode;
         newNode->entity=etemp;
@@ -489,7 +550,7 @@ T* rg_dList<T>::addHead(const T& etemp)
     rg_dNode<T>* newNode=rg_NULL;
     if ( size == 0 )
     {
-        newNode=new rg_dNode<T>();
+        newNode=allocateNode();
         newNode->prev=newNode;
         newNode->next=newNode;
         head=newNode;
@@ -502,14 +563,14 @@ T* rg_dList<T>::addHead(const T& etemp)
         rg_dNode<T> *preNode=tail;
         rg_dNode<T> *nextNode=head;
 
-        newNode=new rg_dNode<T>();
+        newNode=allocateNode();
         newNode->prev=preNode;
         newNode->next=nextNode;
         newNode->entity=etemp;
 
         preNode->next=newNode;
         nextNode->prev=newNode;
-        head=newNode;// Without this line 
+        head=newNode;// Without this line
                      // all line is same as addTail()
     }
     size++;
@@ -546,7 +607,7 @@ T* rg_dList<T>::addAt(const rg_INDEX& index,
 
     //     create Node having etemp
     // and link pre Node and next Node
-    rg_dNode<T> *newNode=new rg_dNode<T>();
+    rg_dNode<T> *newNode=allocateNode();
     newNode->prev=preNode;
     newNode->next=nextNode;
     newNode->entity=eTemp;
@@ -716,7 +777,7 @@ void rg_dList<T>::insertAfter(const T& etemp,rg_dNode<T>* preNode)// insertAfter
     {
         rg_dNode<T> *nextNode=preNode->next;
 
-        rg_dNode<T> *inputNode=new rg_dNode<T>();
+        rg_dNode<T> *inputNode=allocateNode();
         inputNode->entity=etemp;
         inputNode->prev=preNode;
         inputNode->next=nextNode;
@@ -741,7 +802,7 @@ T* rg_dList<T>::insertAfterNode(const T& etemp,rg_dNode<T>* preNode)// insertAft
 	{
 		rg_dNode<T> *nextNode=preNode->next;
 
-		rg_dNode<T> *inputNode=new rg_dNode<T>();
+		rg_dNode<T> *inputNode=allocateNode();
 		inputNode->entity=etemp;
 		inputNode->prev=preNode;
 		inputNode->next=nextNode;
@@ -778,7 +839,7 @@ void rg_dList<T>::insertBefore(const T& etemp,rg_dNode<T>* nextNode)// insert en
     {
         rg_dNode<T> *preNode=nextNode->prev;
 
-        rg_dNode<T> *inputNode=new rg_dNode<T>();
+        rg_dNode<T> *inputNode=allocateNode();
         inputNode->entity=etemp;
         inputNode->prev=preNode;
         inputNode->next=nextNode;
@@ -787,7 +848,7 @@ void rg_dList<T>::insertBefore(const T& etemp,rg_dNode<T>* nextNode)// insert en
         nextNode->prev=inputNode;
         size++;
     }
-    
+
 }
 
 template<class T>
@@ -927,7 +988,7 @@ void rg_dList<T>::kill(rg_dNode<T>* thisNode)
         preNode->next=nextNode;
         nextNode->prev=preNode;
 
-        delete thisNode;
+        deallocateNode(thisNode);
         size--;
 
         if ( size == 0 ) {
@@ -967,7 +1028,7 @@ void rg_dList<T>::killCurrent()
     tempNext->prev=tempPrev;
     tempPrev->next=tempNext;
 
-	delete current;
+	deallocateNode(current);
 
 
 	current = newCurrent;
