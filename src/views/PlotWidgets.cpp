@@ -10,6 +10,7 @@
 #include <numeric>
 #include <cmath>
 #include <limits>
+#include <vector>
 
 // Skin shell color palette: Red -> Blue -> Green -> Orange -> Purple -> ...
 // index 0 = outermost skin (s1)

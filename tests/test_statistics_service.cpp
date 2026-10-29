@@ -3,6 +3,8 @@
 // (pure given a vector<pair<double,double>>; no CTImage instance needed)
 // =============================================================================
 #include <gtest/gtest.h>
+#include <utility>
+#include <vector>
 
 #include "services/StatisticsService.h"
 

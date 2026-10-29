@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <cstdio>
 #include <stdexcept>
+#include <memory>
+#include <string>
+#include <vector>
 
 // =============================================================================
 // findDicomFiles — returns sorted list of .dcm paths

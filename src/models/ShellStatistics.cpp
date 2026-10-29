@@ -1,6 +1,8 @@
 #include "ShellStatistics.h"
 
 #include <cmath>
+#include <utility>
+#include <vector>
 
 namespace ShellStatistics {
 

@@ -6,6 +6,8 @@
 #include <optional>
 #include <stdexcept>
 #include <chrono>
+#include <cstdint>
+#include <utility>
 
 #include "CTShell.h"
 #include "BedDetector.h"

@@ -35,6 +35,7 @@
 
 // DCMTK (for DICOM metadata tags only — same pattern as CTImage)
 #include <dcmtk/dcmdata/dctk.h>
+#include <memory>
 
 // SKINPEELER models
 #include "models/CTImage.h"

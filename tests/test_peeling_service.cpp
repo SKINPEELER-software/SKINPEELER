@@ -3,6 +3,7 @@
 // (pure static functions; no CTImage instance needed)
 // =============================================================================
 #include <gtest/gtest.h>
+#include <vector>
 
 #include "services/PeelingService.h"
 

@@ -29,6 +29,13 @@
 #include <stdexcept>
 #include <cassert>
 #include <cstdio>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 // =============================================================================
 // Internal Voronoi wrapper  (keeps V headers out of CTImage.h)

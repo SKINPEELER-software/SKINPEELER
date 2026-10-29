@@ -44,8 +44,7 @@ target_include_directories(skinpeeler_tests PRIVATE
 
 target_link_libraries(skinpeeler_tests PRIVATE
     ${V_IMAGEPROCESSING_TARGET}
-    ${DCMTK_LIBRARIES}
-    ${DCMJPEG_LIBS}
+    ${DCMTK_LINK_LIBS}
     GTest::gtest_main
 )
 

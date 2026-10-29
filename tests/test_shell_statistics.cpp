@@ -9,6 +9,8 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <utility>
+#include <vector>
 
 #include "models/ShellStatistics.h"
 

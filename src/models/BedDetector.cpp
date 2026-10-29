@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <limits>
 #include <numeric>
+#include <cstdint>
+#include <utility>
+#include <vector>
 
 // =============================================================================
 // fitPolynomial

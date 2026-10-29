@@ -3,6 +3,7 @@
 // (public static pure functions; no VD/DICOM dependency)
 // =============================================================================
 #include <gtest/gtest.h>
+#include <vector>
 
 #include "models/BedDetector.h"
 

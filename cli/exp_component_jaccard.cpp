@@ -43,6 +43,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <limits>
+#include <utility>
 
 // SKINPEELER engine
 #include "models/CTImage.h"

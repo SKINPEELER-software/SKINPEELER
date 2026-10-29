@@ -55,6 +55,7 @@
 #include <filesystem>
 #include <chrono>
 #include <set>
+#include <cstdint>
 
 // SKINPEELER models
 #include "models/CTImage.h"

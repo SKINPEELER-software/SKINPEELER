@@ -15,6 +15,8 @@
 #include <QScrollBar>
 #include <QMouseEvent>
 #include <cmath>
+#include <cstdint>
+#include <vector>
 
 // =============================================================================
 // SkinPeelerView

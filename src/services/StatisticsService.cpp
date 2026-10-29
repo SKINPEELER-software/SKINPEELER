@@ -10,6 +10,10 @@
 #include <sstream>
 #include <iomanip>
 #include <numeric>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 StatisticsService::StatsList StatisticsService::collect(
     const std::vector<std::unique_ptr<CTImage>>& images) {

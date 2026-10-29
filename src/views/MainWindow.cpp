@@ -26,6 +26,10 @@
 #include <cmath>
 #include <thread>
 #include <string>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace {
 // Indeterminate background tasks (shell calculation for a single slice, DICOM

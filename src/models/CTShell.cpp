@@ -2,6 +2,8 @@
 #include <numeric>
 #include <sstream>
 #include <iomanip>
+#include <cmath>
+#include <string>
 
 void CTShell::addVertex(double x, double y, double radius) {
     m_vertices.push_back({x, y, radius});

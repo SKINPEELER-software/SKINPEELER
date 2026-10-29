@@ -79,6 +79,9 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <cstdint>
+#include <map>
+#include <utility>
 
 // SKINPEELER engine
 #include "models/CTImage.h"
