@@ -7,13 +7,15 @@
 ![Qt6](https://img.shields.io/badge/Qt-6-41CD52?logo=qt&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-<!--
-Demo GIF: capture pending. Record a short clip covering: open a DICOM
-directory -> shell overlay appears on the slice -> adjust the beta
-("detection probe") value -> run Peel All with the progress bar visible ->
-save the peeled series. Place the recording at assets/screenshots/demo.gif.
--->
-![SKINPEELER demo](assets/screenshots/demo.gif)
+![3D volume rendering of a shark CT before and after digital skin removal](assets/screenshots/hero_3d_before_after.png)
+
+*Left: the dermal denticle (skin) layer hides the internal anatomy. Right: the
+same volume after SKINPEELER removes the layer slice by slice. Adapted from
+Kim et al., Scientific Reports 15, 19659 (2025), CC BY 4.0.*
+
+<!-- Optional demo GIF (capture pending): open DICOM -> shell overlay ->
+adjust beta -> Peel All with progress bar -> save. Place at
+assets/screenshots/demo.gif and embed here. -->
 
 SKINPEELER segments the high-density outer boundary of a biological specimen
 (e.g. a dermal denticle / skin layer) out of a CT slice series, using an
@@ -69,25 +71,20 @@ for a description of the pipeline and parameters.
   for comparing the algorithm's cut against a hand-drawn reference
 - Export of the peeled DICOM series and a per-slice statistics report
 
-<!-- Screenshot: main DICOM viewer with a loaded CT slice, before any
-     shell overlay or peeling. Save as assets/screenshots/main_viewer.png -->
-<!-- Screenshot: same slice with the shell overlay enabled, showing the
-     concentric shells extracted from the Voronoi diagram. Save as
-     assets/screenshots/shell_overlay.png -->
-<!-- Screenshot: the statistics window (Gaussian / scatter / histogram
-     plots) for one slice. Save as assets/screenshots/statistics.png -->
-<!-- Screenshot: a slice after peeling, showing the high-density boundary
-     layer removed. Save as assets/screenshots/peel_result.png -->
-
-| Main viewer | Shell overlay |
+| Desktop GUI | Shell statistics |
 |---|---|
-| ![main viewer](assets/screenshots/main_viewer.png) | ![shell overlay](assets/screenshots/shell_overlay.png) |
+| ![Desktop GUI with a detected skin boundary](assets/screenshots/gui_main.png) | ![Per-shell mean/spread scatter with the Mahalanobis ellipse and skin outliers](assets/screenshots/stats_scatter.png) |
 
-| Statistics | Peel result |
-|---|---|
-| ![statistics](assets/screenshots/statistics.png) | ![peel result](assets/screenshots/peel_result.png) |
+Validation against expert annotations across five shark species:
+
+![CT, expert annotation, and SKINPEELER boundary for five species](assets/screenshots/species_validation.png)
 
 ## Algorithm
+
+![From a CT slice to peeled output: skin recognition, enlarged views, pixel-to-disk transform, Voronoi diagram, quasi-triangulation, beta-shape, and shells](assets/screenshots/pipeline_overview.png)
+
+*End-to-end view of the method on one slice (A–L). Adapted from Kim et al.,
+Scientific Reports 15, 19659 (2025), CC BY 4.0.*
 
 SKINPEELER segments the high-density boundary of a slice in five stages:
 **P2D transformation** maps each pixel's Hounsfield Unit value to a disk
