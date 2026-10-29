@@ -12,8 +12,9 @@ project(SKINPEELER VERSION 2.0 LANGUAGES CXX)
 # V-ImageProcessing (third-party Voronoi/beta-complex library):
 #   By default this project links the prebuilt static library and headers
 #   bundled under third_party/v_imageprocessing/ (Linux x86_64 only for now).
-#   TODO: a Windows (MSVC) prebuilt .lib is not yet bundled — building on
-#   Windows currently requires -DV_IP_SOURCE_ROOT pointing at an internal
+#   Prebuilt libraries are bundled for Linux (GCC) and Windows (MSVC x64).
+#   Building against a different V-ImageProcessing checkout instead requires
+#   -DV_IP_SOURCE_ROOT pointing at an internal
 #   source checkout (lab-internal use only; see below).
 #
 # Internal/lab build (private source checkout available):
