@@ -8,6 +8,8 @@ Center (VDRC), Hanyang University**.
 
 ## Status
 
+- The bundled binary is a performance- and correctness-patched build of
+  V-ImageProcessing.
 - The library's source code is **not** included in this repository and
   remains private to VDRC. Only the public headers required to compile
   against the library, and a prebuilt binary artifact, are bundled here —
