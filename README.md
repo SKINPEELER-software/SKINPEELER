@@ -58,10 +58,6 @@ The method has been validated across multiple shark species in the
 companion publication above. See [`docs/algorithm.md`](docs/algorithm.md)
 for a description of the pipeline and parameters.
 
-**Follow-up experiment.** [`learned-model/`](learned-model/) contains a U-Net
-trained only on SKINPEELER outputs (no expert annotation), with its
-architecture, training setup, scores and weights. It shows that SKINPEELER
-can serve as a label generator for deep segmentation models.
 
 ## Features
 
@@ -146,6 +142,51 @@ flowchart TB
 The engine layer (`src/models`, `src/services`) has no Qt dependency, so the
 same engine code is reusable from other front ends (e.g. a web service)
 without modification.
+
+## Learned model
+
+SKINPEELER needs no training data, which makes it a label generator for
+models that do. [`learned-model/`](learned-model/) contains a U-Net trained
+only on SKINPEELER outputs — no expert annotation in training, model
+selection, or parameter selection — and evaluated against expert annotation
+on specimens it had never seen.
+
+![Expert annotation, SKINPEELER label, the U-Net trained on SKINPEELER labels, a U-Net trained on threshold-band labels, and SAM ViT-H zero-shot on the same slice](learned-model/assets/comparison.png)
+
+*Green: agrees with expert annotation. Red: predicted but not annotated.
+Blue: annotated but not predicted.*
+
+```mermaid
+flowchart LR
+    A["CT series<br/>(5 specimens)"] --> B["SKINPEELER engine<br/>beta per specimen,<br/>Mahalanobis + BIC cut"]
+    B --> C["Pseudo-labels<br/>2,905 slices"]
+    C --> D["U-Net training<br/>leave-one-specimen-out"]
+    D --> E["Trained model<br/>6 ms per slice (GPU)"]
+    X["Expert annotation<br/>(5 slices)"] -. "scoring only" .-> E
+```
+
+| | Dice vs. expert annotation |
+| --- | --- |
+| U-Net trained on SKINPEELER pseudo-labels | 0.819 |
+| SKINPEELER (the label generator) | 0.801 |
+| U-Net trained on threshold-band labels | 0.746 |
+| U-Net trained on 4 expert-annotated slices | 0.704 |
+| SAM / MedSAM / SAM 2.1, zero-shot | ≤ 0.178 |
+
+**Model.** Encoder–decoder U-Net written from scratch in PyTorch: 5 encoder
+stages with 32 base channels (32-64-128-256-512), two 3×3 convolutions with
+BatchNorm and ReLU per stage, bilinear upsampling in the decoder, and skip
+connections. The first stage works at input resolution, so the
+full-resolution skip connection carries the 1–3 pixel wide boundary layer to
+the decoder. 7.2 million parameters, trained from scratch with binary
+cross-entropy + Dice loss (AdamW, OneCycleLR, mixed precision).
+
+The model reaches the level of its label generator and runs about 170 times
+faster (6 ms vs. about 1.1 s per 512 × 512 slice, GPU vs. one CPU process).
+Pretrained encoders (ResNet34, SegFormer MiT-B2), nnU-Net and a fine-tuned
+MedSAM mask decoder were trained on the same labels for comparison. The
+full results, hyperparameter tuning, training code, inference script and
+weights are in [`learned-model/`](learned-model/).
 
 ## Quick start
 
@@ -237,6 +278,7 @@ SKINPEELER/
 │   └── config/     # Settings.h (algorithm/UI constants)
 ├── cli/            # Standalone experiment CLI tools (no Qt dependency)
 ├── tests/          # GoogleTest + CTest suite
+├── learned-model/   # U-Net trained on SKINPEELER pseudo-labels (PyTorch): model, training, inference
 ├── sample_data/     # Synthetic phantom DICOM series + generator notes
 ├── data/test/      # Worked example: a real CT slice series + its SKINPEELER output
 ├── tools/          # make_phantom.py (phantom generator)
