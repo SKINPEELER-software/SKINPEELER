@@ -1,7 +1,8 @@
 # V-ImageProcessing — Third-Party Binary Notice
 
-This directory bundles a **prebuilt static library** (`lib/linux-x86_64/libV_2D.a`)
-and its public C++ headers (`include/`) for **V-ImageProcessing**, a computational
+This directory bundles **prebuilt static libraries** (`lib/linux-x86_64/libV_2D.a`,
+`lib/win-x64/V_2D.lib`) and the public C++ headers (`include/`) for
+**V-ImageProcessing**, a computational
 geometry library (Voronoi diagram / beta-complex construction) that is
 **proprietary software owned and developed by the Voronoi Diagram Research
 Center (VDRC), Hanyang University**.
@@ -31,10 +32,51 @@ Center (VDRC), Hanyang University**.
 
 ## Platform coverage
 
-- `lib/linux-x86_64/libV_2D.a` — built with GCC, Release (`-O3 -DNDEBUG`),
-  position-independent code, C++17.
-- Windows (`V_2D.lib`, MSVC) is **not yet included** (TODO — see top-level
-  README build notes).
+| Library | Toolchain | Shell-front functions |
+|---|---|---|
+| `lib/linux-x86_64/libV_2D.a` | GCC 11, Release (`-O3 -DNDEBUG`), position-independent code, C++17 | yes |
+| `lib/win-x64/V_2D.lib` | MSVC x64, Release | no |
+
+The headers in `include/` describe the Linux library. The *shell-front
+functions* are `ImageProcessingBC::select_componentBSFace_by_id`,
+`collect_outer_shell_front`, and `expand_shell_front` (with the types
+`ShellVertex` and `ShellFront`). The Windows library is an earlier build
+that does not export them. The top-level `CMakeLists.txt` detects this by
+searching the library for the function name, and with the Windows library:
+
+- the engine uses its `QuasiVertex` / `QuasiEdge` wrapper traversal, which
+  produces the same shells;
+- the GUI (`SKINPEELER`), the experiment tools, the engine library
+  (`skinpeeler_core`), and the GoogleTest suite build and run;
+- the batch command-line program `skinpeeler_cli` and its CTest smoke tests
+  are **not built**.
+
+## Rebuilding the bundle (lab-internal)
+
+Rebuilding requires the private V-ImageProcessing source checkout. Both
+libraries are the `V_2D` target of this repository's own `CMakeLists.txt`,
+configured with `-DV_IP_SOURCE_ROOT`.
+
+**Linux** — one script builds the library, copies it into
+`lib/linux-x86_64/`, and refreshes the bundled headers that differ from the
+source checkout:
+
+```bash
+tools/rebuild_v_imageprocessing_bundle.sh /path/to/V-ImageProcessing/src/V
+```
+
+**Windows** (x64 Native Tools Command Prompt for Visual Studio, with the same
+Qt and DCMTK setup used for a normal build):
+
+```bat
+cmake -B build_v_imageprocessing -DV_IP_SOURCE_ROOT=C:\path\to\V-ImageProcessing\src\V -DBUILD_TESTING=OFF
+cmake --build build_v_imageprocessing --config Release --target V_2D
+copy /Y build_v_imageprocessing\Release\V_2D.lib third_party\v_imageprocessing\lib\win-x64\V_2D.lib
+```
+
+A fresh configure of the normal build (`cmake -B build`) then reports
+`V-ImageProcessing shell-front primitives: available` and builds
+`skinpeeler_cli`.
 
 ## Building against this library
 

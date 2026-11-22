@@ -10,7 +10,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # Full build (GUI + CLI + tests) using the bundled prebuilt V-ImageProcessing
   # static library (third_party/v_imageprocessing/lib/linux-x86_64/libV_2D.a),
-  # followed by the full CTest suite (48 unit/integration tests).
+  # followed by the full CTest suite (68 GoogleTest unit/integration tests and
+  # 5 skinpeeler_cli smoke tests on the bundled phantom series).
   # ---------------------------------------------------------------------------
   build-and-test:
     runs-on: ubuntu-latest
@@ -56,11 +57,9 @@ jobs:
             | xargs -0 -n1 clang-format --dry-run --Werror
 
 # -----------------------------------------------------------------------------
-# TODO (Windows/MSVC job): not added yet. third_party/v_imageprocessing/ only
-# bundles the Linux (libV_2D.a) prebuilt; the Windows (V_2D.lib, MSVC) build
-# is not yet bundled in this repo (see third_party/v_imageprocessing/NOTICE.md
-# and the CMakeLists.txt V-ImageProcessing section), so a windows-latest job
-# would fail at configure time with the "prebuilt library not found" error.
-# Add a `windows-latest` job here (vcpkg/Qt install + cmake -B build + ctest)
-# once a Windows V_2D.lib is bundled.
+# TODO (Windows/MSVC job): not added yet. A `windows-latest` job (vcpkg/Qt
+# install + cmake -B build + ctest) would build against the bundled
+# third_party/v_imageprocessing/lib/win-x64/V_2D.lib; with that library
+# skinpeeler_cli and its smoke tests are not built (see
+# third_party/v_imageprocessing/NOTICE.md).
 # -----------------------------------------------------------------------------

@@ -76,6 +76,10 @@ for a description of the pipeline and parameters.
 - Manual annotation mode (paint / clear / export a ground-truth skin mask)
   for comparing the algorithm's cut against a hand-drawn reference
 - Export of the peeled DICOM series and a per-slice statistics report
+- Batch command-line program (`skinpeeler_cli`): per-slice shell statistics
+  and skin cut for one or many beta values, air-excluded skin masks,
+  per-specimen beta selection, and whole-series peeling — see
+  [Command-line program](#command-line-program)
 
 | Desktop GUI | Shell statistics |
 |---|---|
@@ -123,11 +127,13 @@ the concurrency model.
 
 ```mermaid
 flowchart TB
-    subgraph UI["UI layer (src/views)"]
+    subgraph UI["UI layer (src/views, cli)"]
         GUI["Qt 6 desktop GUI<br/>MainWindow / SkinPeelerScene / PlotWidgets"]
+        CLI["Batch command-line program<br/>skinpeeler_cli"]
     end
-    subgraph ENGINE["SKINPEELER engine (src/models, src/services)"]
-        M["Models<br/>CTImage / CTShell / BedDetector / ShellStatistics"]
+    subgraph ENGINE["SKINPEELER engine (src/models, src/services, src/engine)"]
+        SE["Session flow<br/>skinpeeler::Session"]
+        M["Models<br/>CTImage / CTShell / BedDetector / ShellStatistics / BetaSelection"]
         S["Services<br/>DicomService / PeelingService / StatisticsService"]
     end
     subgraph LIB["V-ImageProcessing (third_party/)"]
@@ -135,13 +141,18 @@ flowchart TB
     end
     GUI --> S
     GUI --> M
+    CLI --> SE
+    CLI --> M
+    SE --> S
+    SE --> M
     S --> M
     M --> V
 ```
 
-The engine layer (`src/models`, `src/services`) has no Qt dependency, so the
-same engine code is reusable from other front ends (e.g. a web service)
-without modification.
+The engine layer (`src/models`, `src/services`, `src/engine`) has no Qt
+dependency, so the same engine code is reusable from other front ends (e.g.
+a web service) without modification. It is also built as a static library
+(`skinpeeler_core`) for programs that link the engine.
 
 ## Learned model
 
@@ -208,10 +219,13 @@ sudo apt install qt6-base-dev libdcmtk-dev
 
 (Qt 5 >= 5.13 is also supported as a fallback if Qt 6 is not found.)
 
-**Windows (MSVC):** a prebuilt Windows `V_2D.lib` for V-ImageProcessing is
-not yet bundled in this repository — see
+**Windows (MSVC x64):** Qt 6 and DCMTK (e.g. through vcpkg). A prebuilt
+`V_2D.lib` for V-ImageProcessing is bundled. The bundled Windows library
+does not contain the shell-front traversal functions that the batch
+command-line program requires, so on Windows `skinpeeler_cli` and its smoke
+tests are not built; the GUI, the experiment tools, and the unit tests build
+and run. See
 [`third_party/v_imageprocessing/NOTICE.md`](third_party/v_imageprocessing/NOTICE.md).
-TODO: bundle a Windows prebuilt library once available.
 
 ### Build
 
@@ -257,18 +271,61 @@ output for it, as a worked example:
 # File -> Open DICOM Directory -> data/test/original
 ```
 
+## Command-line program
+
+`skinpeeler_cli` runs the engine on a DICOM series without the GUI. It only
+parses arguments and writes files; every value comes from the engine.
+
+```bash
+# Per-slice shell statistics and skin cut for beta = 0.60, 0.61, ..., 0.70.
+# One slice is in memory at a time; one Voronoi structure per slice serves
+# all beta values. --masks also writes the air-excluded skin mask and the
+# air mask of every slice and beta as PNG.
+./build/skinpeeler_cli shells sample_data/phantom --out out/phantom \
+    --beta-range 0.60 0.70 0.01 --masks
+
+# Per-specimen beta from that output, by one rule or by all twelve.
+./build/skinpeeler_cli select-beta out/phantom --rule all
+
+# Peel every slice of the series at its skin cut and write the DICOM series.
+./build/skinpeeler_cli peel sample_data/phantom --out out/phantom_peeled --beta 0.69
+```
+
+| Command | Output |
+|---|---|
+| `shells` | `slices.csv` (one row per slice and beta: selected component, number of shells, cut, cut rule, BIC threshold, air threshold, mask pixel counts), `shells.csv` (one row per shell: mu, sigma, vertex count, Mahalanobis distance), `manifest.json` (settings, command line, timing), and with `--masks` `masks/b<beta>/<file>_skin.png` and `_air.png` |
+| `select-beta` | `beta_selection.csv` / `.json` (selected beta and the per-beta score table), or with `--rule all` one summary plus one table per rule |
+| `peel` | `peeled-<file>` DICOM series and `manifest.json` |
+
+`--range START:END` restricts `shells` to a slice range (intensity
+normalization still uses the maximum of the full series), so a long series
+can be processed in chunks; `select-beta` accepts several output directories
+of the same specimen. `skinpeeler_cli --help` lists every option. Exit code
+0 means every slice succeeded, 1 that at least one slice failed, 2 a usage
+or fatal error. The beta-selection rules are described in
+[`docs/algorithm.md`](docs/algorithm.md#selecting-beta-for-a-specimen).
+
+`skinpeeler_cli` is built when the linked V-ImageProcessing library provides
+the shell-front traversal functions (the bundled Linux library does; the
+bundled Windows library does not — see
+[`third_party/v_imageprocessing/NOTICE.md`](third_party/v_imageprocessing/NOTICE.md)).
+
 ## Tests & CI
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-48 GoogleTest unit/integration tests cover the pure-math cutting-statistics
-module (`ShellStatistics`), `CTShell` statistics, `BedDetector`'s public
-static helpers, `PeelingService`'s section/interpolation math,
-`StatisticsService`'s inter-shell distance computation, and one end-to-end
-integration test that loads the bundled phantom DICOM slice and runs
-`CTImage::calculateShells()`. GitHub Actions
+68 GoogleTest unit/integration tests cover the pure-math cutting-statistics
+module (`ShellStatistics`), the beta-selection rules (`BetaSelection`),
+`CTShell` statistics, `BedDetector`'s public static helpers,
+`PeelingService`'s section/interpolation math, `StatisticsService`'s
+inter-shell distance computation, and engine tests on the bundled phantom
+DICOM series: `CTImage::calculateShells()`, the agreement of
+`CTImage::sweepBetas()` with a separate calculation at each beta, the shell /
+skin / air-excluded masks, and `skinpeeler::Session`. Five CTest smoke tests
+run `skinpeeler_cli` (`shells`, `select-beta`, `peel`, `--version`, a usage
+error) on the phantom series. GitHub Actions
 (`.github/workflows/ci.yml`) runs the full build + CTest suite and a
 clang-format compliance check on every push/PR to `main`.
 
@@ -279,17 +336,18 @@ SKINPEELER/
 ├── CMakeLists.txt
 ├── Manual.md       # End-user manual (v1.0 executable)
 ├── src/
-│   ├── models/     # Engine: CTImage, CTShell, BedDetector, BedCache, ShellStatistics
+│   ├── models/     # Engine: CTImage, CTShell, BedDetector, BedCache, ShellStatistics, BetaSelection
 │   ├── services/    # Engine: DicomService, PeelingService, StatisticsService
+│   ├── engine/     # Engine: Session (load, calculate, query, peel, save; one-slice-at-a-time series access)
 │   ├── views/      # Qt GUI: MainWindow, SkinPeelerScene, PlotWidgets, PlotWindow
 │   ├── utils/      # CoordinateTransform
 │   └── config/     # Settings.h (algorithm/UI constants)
-├── cli/            # Standalone experiment CLI tools (no Qt dependency)
+├── cli/            # skinpeeler_cli (batch command-line program) and standalone experiment tools (no Qt dependency)
 ├── tests/          # GoogleTest + CTest suite
 ├── learned-model/   # U-Net trained on SKINPEELER pseudo-labels (PyTorch): model, training, inference
 ├── sample_data/     # Synthetic phantom DICOM series + generator notes
 ├── data/test/      # Worked example: a real CT slice series + its SKINPEELER output
-├── tools/          # make_phantom.py (phantom generator)
+├── tools/          # make_phantom.py (phantom generator), rebuild_v_imageprocessing_bundle.sh (lab-internal)
 ├── third_party/
 │   └── v_imageprocessing/  # Prebuilt V-ImageProcessing library + public headers
 ├── assets/         # App icon, screenshots, demo GIF

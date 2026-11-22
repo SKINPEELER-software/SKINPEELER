@@ -71,8 +71,9 @@ Beta controls how permissive the complex is in connecting nearby disks.
 Beta is a specimen-level parameter: one value is used for every slice of a
 specimen's CT series. `DEFAULT_BETA` in `src/config/Settings.h` is the
 starting value, and the GUI's "detection probe" control changes it for the
-loaded series. See the papers above for how beta is chosen/validated for a
-given specimen.
+loaded series. See [Selecting beta for a specimen](#selecting-beta-for-a-specimen)
+for the selection rules implemented in the engine, and the papers above for
+how beta is chosen/validated for a given specimen.
 
 ## 4. Iterative shell peeling
 
@@ -143,6 +144,65 @@ This is a pure-math module (`src/models/ShellStatistics.*`) with no
 dependency on `CTImage`, V-ImageProcessing, or DCMTK, so the cut-decision
 logic is unit-tested directly against synthetic `(mu, sigma)` inputs (see
 `tests/test_shell_statistics.cpp`).
+
+## Air-excluded skin mask
+
+`CTImage::shellMask(first, last)` rasterizes the vertices of a range of
+shells to a pixel mask, and `CTImage::skinMask(cut)` is the mask of shells
+`S0 .. S_cut` — the pixels that peeling removes. `CTImage::noAirMasks(cut)`
+separates the air side of that region. With `I` the normalized image, `S0`
+the mask of the outermost shell, `C` the skin mask, and `T` the largest
+intensity over the pixels of `S0`:
+
+```
+skin = C AND NOT S0 AND (I > T)
+air  = S0 OR (I <= T)
+```
+
+The outermost shell lies on the air side of the boundary, so its brightest
+pixel gives the air threshold of the slice. When `S0` covers no pixel, `T`
+is minus infinity: no pixel is removed by intensity and the air mask is
+empty.
+
+## Selecting beta for a specimen
+
+Beta is one value per specimen. The engine evaluates a slice at several beta
+values on a single Voronoi structure (`CTImage::sweepBetas`): the
+quasi-triangulation does not depend on beta, so only stages 3–5 are repeated
+for each value. Each evaluation yields a per-slice record
+(`BetaSelection::SliceRecord`): whether the Mahalanobis + BIC cut could be
+evaluated (*judgeable*), whether a changepoint was selected, the cut index,
+the number of shells, the selected component's area, number of components and
+inner loops, and per-shell vertex counts and squared distances.
+
+`BetaSelection::select` takes the records of a specimen (optionally
+restricted to a range of valid slices and a range of candidate beta values)
+and one rule, and returns the selected beta together with the per-beta score
+table. No rule uses ground-truth labels. A tie goes to the smaller beta.
+
+| Rule | Selects |
+|---|---|
+| `A1` | plateau entry: the smallest candidate from which every adjacent pair of candidates has mean agreement `D >= 0.98` |
+| `A2` | the largest mean agreement with the other candidates within `+-0.02` |
+| `A3` | the largest share of judgeable slices whose cut is the same at every candidate within `+-0.01` |
+| `A4` | plateau entry as `A1`, with threshold `0.9741` |
+| `B1` | the largest median BIC decisiveness, `BIC0 - min BIC1` |
+| `B2` | the largest median separation contrast, `log(d2[cut] / d2[cut+1])` (last skin shell against first body shell) |
+| `B3` | the smallest median `log det` of the covariance of `(mu, sigma)` over the body shells |
+| `B4` | the smallest share of valid slices without a BIC changepoint |
+| `C1` | onset + margin: per slice, the first beta at which the component area reaches `0.9` of its area at the reference beta (the largest beta present); the 90th percentile of those, rounded up to a candidate |
+| `C2` | area plateau: the smallest candidate from which the median relative area change between adjacent candidates is at most `0.01` |
+| `C3a` | the first beta of the longest run of candidates with the same (median number of components, median number of inner loops) |
+| `C4` | shell-count plateau: the smallest candidate from which the median number of shells changes by at most `1` between adjacent candidates |
+
+The agreement `D(beta, beta')` is the mean, over slices judgeable at both
+values, of the Dice coefficient of the skin shells `S0 .. S_cut` counted in
+vertices. The thresholds above are the defaults of `BetaSelection::Params`;
+each can be overridden. A rule that cannot decide (for example, fewer than
+two candidates for a plateau rule) returns no beta and states the reason.
+
+`skinpeeler_cli shells --beta-range` writes the per-slice records of a
+series, and `skinpeeler_cli select-beta` applies one rule or all of them.
 
 ## Parameters at a glance
 
