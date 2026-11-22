@@ -7,6 +7,9 @@
 #include <stdexcept>
 #include <chrono>
 #include <cstdint>
+#include <functional>
+#include <limits>
+#include <cstdint>
 #include <utility>
 
 #include "CTShell.h"
@@ -150,6 +153,51 @@ public:
         return m_mahalFit;
     }
 
+    // Which rule produced algoPeelIndex() in the last calculateShells() /
+    // sweepBetas() evaluation. Unknown until one of them has run.
+    enum class CutRule {
+        Unknown,           // not computed yet
+        None,              // fewer than 2 shells: no cut defined (index 0)
+        MahalBic,          // Mahalanobis + BIC changepoint
+        ThreeSigma,        // 3-sigma ellipse rule
+        Euclidean,         // configured Euclidean / GMM-stub rule
+        EuclideanFallback  // configured rule could not run (too few shells / error)
+    };
+    CutRule cutRule() const {
+        return m_cutRule;
+    }
+
+    // Per-slice inputs of the beta-selection rules (BetaSelection.h), for the
+    // current beta. judgeable(): the Mahalanobis + BIC cut could be evaluated
+    // (enough shells for the fit). b2Contrast(): B2 separation contrast
+    // log(d2[cut] / d2[cut+1]) at the algorithm's cut; NaN when not defined
+    // (not judgeable, cut < 2, no shell after the cut, or d2[cut+1] == 0).
+    bool judgeable() const {
+        return m_mahalFit.active;
+    }
+    double b2Contrast() const;
+    static const char* cutRuleName(CutRule rule);
+
+    // Configuration read-outs for provenance records (manifest files).
+    static const char* cuttingAlgorithmName(CuttingAlgorithm algo);
+    // Component selection score uses outer-loop circularity (geometry library
+    // switch, default true) rather than total-boundary circularity.
+    static bool selectionUsesOuterLoopCircularity();
+
+    // Selected beta-complex component (the body), recorded by calculateShells()
+    // / sweepBetas() after the final component selection (i.e. after the bed
+    // removal replacement when that is enabled). valid == false until then.
+    struct ComponentSummary {
+        bool valid = false;
+        int nComponents = 0;
+        double area = 0.0;
+        double outerCircularity = 0.0;
+        int nInnerLoops = 0;  // inner (hole) loops of the selected component
+    };
+    const ComponentSummary& componentSummary() const {
+        return m_componentSummary;
+    }
+
     // -------------------------------------------------------------------------
     // Bed removal control
     // Default off — when disabled, calculateShells() behaves exactly as before.
@@ -184,6 +232,92 @@ public:
     // all shells adds negligible overhead (~1.3MB for ~96 shells) but eliminates
     // the need to rebuild VD if full shell data is needed later (e.g. analysis).
     void calculateShells();
+
+    // -------------------------------------------------------------------------
+    // sweepBetas — evaluate several beta values on ONE Voronoi structure.
+    //
+    // Builds the Voronoi structure once, then for each beta runs exactly the
+    // code calculateShells() runs after construction (component selection,
+    // optional bed removal, shell extraction, cutting rule). After each beta
+    // the object is in the same state calculateShells() would leave it in at
+    // that beta (shells(), peelIndex(), mahalFit(), ... are all valid), and
+    // onBeta is invoked with a summary so the caller can also query the object
+    // (e.g. shellMask()) before the next beta overwrites the state.
+    //
+    // A failure at one beta is reported through BetaEvaluation::ok / error and
+    // the sweep continues with the next beta. A Voronoi construction failure
+    // throws VoronoiError (no beta can be evaluated).
+    //
+    // On return: Voronoi released, beta() == last beta of the list, state ==
+    // last evaluation. An empty list is a no-op.
+    // -------------------------------------------------------------------------
+    struct ShellSummary {
+        double mu = 0.0;
+        double sigma = 0.0;
+        int nVertices = 0;
+        bool hasStatistics = false;
+        bool hasMahal = false;  // false: shell not scored by the cutting rule
+        double mahalD = -1.0;   // Mahalanobis distance (-1 when !hasMahal)
+        double mahalD2 = -1.0;  // squared distance (-1 when !hasMahal)
+        bool inside = false;    // cutting rule's inside flag
+    };
+    struct BetaEvaluation {
+        double beta = 0.0;
+        bool ok = false;
+        std::string error;  // set when !ok
+        ComponentSummary component;
+        std::vector<ShellSummary> shells;  // index 0 = outermost shell
+        int cut = 0;                       // == algoPeelIndex()
+        CutRule cutRule = CutRule::Unknown;
+        MahalFit fit;
+        bool timedOut = false;
+        // Beta-selection inputs (BetaSelection.h)
+        bool judgeable = false;                                        // == judgeable()
+        double b2Contrast = std::numeric_limits<double>::quiet_NaN();  // == b2Contrast()
+    };
+    using BetaCallback = std::function<void(const BetaEvaluation&)>;
+    void sweepBetas(const std::vector<double>& betas, const BetaCallback& onBeta);
+
+    // Summary of the current state (what sweepBetas passes to its callback).
+    BetaEvaluation summarizeEvaluation() const;
+
+    // -------------------------------------------------------------------------
+    // shellMask — rasterize shells[firstShell..lastShell] (inclusive, clamped to
+    // the available shells) to a flat height()*width() row-major mask, 1 = a
+    // shell vertex maps to that pixel. Same coordinate transform as peelSkin().
+    // skinMask(cut) == shellMask(0, cut): the skin region peelSkin() removes
+    // for peel index `cut` (cut < 0 → peelIndex()).
+    // -------------------------------------------------------------------------
+    std::vector<uint8_t> shellMask(int firstShell, int lastShell) const;
+    std::vector<uint8_t> skinMask(int cut = -1) const;
+
+    // -------------------------------------------------------------------------
+    // noAirMasks — the project's "air-excluded" skin region, defined here so no
+    // mask arithmetic is left to callers. With
+    //   I  = image() (the normalized image the shells are computed on),
+    //   S0 = shellMask(0, 0)              (outermost shell),
+    //   C  = skinMask(cut)                (shells 0..cut; cut < 0 → peelIndex()),
+    //   T  = max of I over the pixels of S0   (-infinity when S0 has no pixel),
+    // the masks are
+    //   skin = C AND NOT S0 AND (I > T)
+    //   air  = S0 OR (I <= T)
+    // (strict '>' on the skin side). When S0 has no pixel, T = -infinity: no
+    // pixel is removed by intensity and the air mask is empty.
+    // Equivalently: the skin region with S0 removed, then with every pixel of
+    // intensity <= max(I over S0) removed.
+    // Masks are flat height()*width(), row-major, 1 = set; same orientation as
+    // skinMask(). Call before peelSkin(): peeling zeroes pixels of image().
+    // -------------------------------------------------------------------------
+    struct NoAirMasks {
+        double airThreshold = 0.0;  // T (may be -infinity)
+        bool s0Empty = true;        // S0 rasterized to no pixel
+        std::vector<uint8_t> skin;
+        std::vector<uint8_t> air;
+        int nSkinPixels = 0;
+        int nAirPixels = 0;
+        int nS0Pixels = 0;
+    };
+    NoAirMasks noAirMasks(int cut = -1) const;
 
     // Zero out pixels in specified region (default: whole body)
     void peelSkin(PeelRegion region = PeelRegion::WholeBody);
@@ -308,11 +442,13 @@ private:
     // Shell calculation internals
     // -------------------------------------------------------------------------
 
-    // Shared Voronoi-construction step used by both calculateShells() and
-    // computeBiggestComponentMask(): transpose image to column-major, read
-    // BitsStored, constructForImageProcessing16bit, set_beta_value,
-    // classifyByComponents. Allocates m_voronoi.
-    void buildAndClassifyVoronoi();
+    // Voronoi construction (beta-independent) and the per-beta evaluation that
+    // follows it. calculateShells() = buildVoronoi() + evaluateCurrentBeta();
+    // sweepBetas() = buildVoronoi() + evaluateCurrentBeta() per beta.
+    void buildVoronoi();
+    void evaluateCurrentBeta();
+    void clearDerivedState();
+    void recordComponentSummary();
 
     void extractOuterShell();
     void calculateInnerShellsAdaptive(bool maximize = false);
@@ -367,6 +503,8 @@ private:
     std::vector<bool>
         m_shellInside;    // shell[0]=false, shell[1+]=d<=threshold (S1 false for MAHAL_BIC)
     MahalFit m_mahalFit;  // filled by cuttingMahalBic()
+    CutRule m_cutRule = CutRule::Unknown;  // set by calculateCuttingShell()
+    ComponentSummary m_componentSummary;   // set by evaluateCurrentBeta()
 
     // Voronoi object — released after shell extraction via releaseVoronoi()
     struct VoronoiImpl;

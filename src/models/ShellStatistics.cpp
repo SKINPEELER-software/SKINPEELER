@@ -187,10 +187,12 @@ void meanVar(const double* x, int n, double& mean, double& var) {
 }
 }  // namespace
 
-int bicChangepoint(const std::vector<double>& d2) {
+BicTerms bicChangepointTerms(const std::vector<double>& d2) {
+    BicTerms terms;
     const int m = static_cast<int>(d2.size());
     if (m < 3)
-        return -1;
+        return terms;
+    terms.defined = true;
     const double* x = d2.data();
 
     // H0: single Gaussian, p = 2
@@ -215,11 +217,20 @@ int bicChangepoint(const std::vector<double>& d2) {
             bestK = k;
         }
     }
+    terms.ic0 = ic0;
+    terms.bestIc1 = bestIc;
+    terms.bestK = bestK;
     if (bestK < 0 || !std::isfinite(bestIc))
-        return -1;
-    if (ic0 <= bestIc)
-        return -1;
-    return bestK;
+        terms.changepoint = -1;
+    else if (ic0 <= bestIc)
+        terms.changepoint = -1;
+    else
+        terms.changepoint = bestK;
+    return terms;
+}
+
+int bicChangepoint(const std::vector<double>& d2) {
+    return bicChangepointTerms(d2).changepoint;
 }
 
 int cutFromThreshold(const std::vector<double>& d, int firstShellIndex, double tau) {

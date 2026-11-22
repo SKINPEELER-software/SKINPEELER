@@ -18,6 +18,7 @@
 
 // Pure cutting-statistics math (S1 extraction — no CTImage/V-IP/DCMTK dependency)
 #include "ShellStatistics.h"
+#include "BetaSelection.h"
 
 #include "utils/CoordinateTransform.h"
 
@@ -38,16 +39,164 @@
 #include <vector>
 
 // =============================================================================
-// Internal Voronoi wrapper  (keeps V headers out of CTImage.h)
-// Stores outer-shell QuasiVertex objects so that calculateInnerShellsAdaptive()
-// can use them as seeds without re-invoking get_edge_of_outer_loop_of_biggest_componentBSFace().
+// Shell traversal on the quasi-triangulation
+//
+// One traversal step yields the vertices of one shell plus the "front" (vertex
+// handles) that seeds the next step. Two interchangeable implementations with
+// identical vertex order and visited-flag semantics:
+//
+//   SKINPEELER_HAVE_SHELL_FRONT == 1  ImageProcessingBC shell-front primitives
+//       (collect_outer_shell_front / expand_shell_front): work on the raw
+//       Voronoi vertex pointers and allocate no wrapper objects.
+//   SKINPEELER_HAVE_SHELL_FRONT == 0  QuasiVertex / QuasiEdge wrapper loop, for
+//       a V-ImageProcessing library build that does not export the shell-front
+//       primitives.
+//
+// CMake sets the macro from the linked V-ImageProcessing library (see the
+// V-ImageProcessing section of the top-level CMakeLists.txt).
 // =============================================================================
+#ifndef SKINPEELER_HAVE_SHELL_FRONT
+#define SKINPEELER_HAVE_SHELL_FRONT 1
+#endif
+
+#if !SKINPEELER_HAVE_SHELL_FRONT
 #include "QuasiVertex.h"
 #include "QuasiEdge.h"
+#endif
 
+namespace {
+
+#if SKINPEELER_HAVE_SHELL_FRONT
+
+using ShellFront = V::ImageProcessingBC::ShellFront;
+
+// Build a CTShell from one traversal step's vertices.
+CTShell makeShell(const std::vector<V::ImageProcessingBC::ShellVertex>& verts) {
+    CTShell shell;
+    for (const auto& v : verts)
+        shell.addVertex(v.x, v.y, v.radius);
+    return shell;
+}
+
+// Shell[0] of the biggest component (selection score): its outer-loop
+// vertices. `front` receives the vertex handles.
+CTShell collectOuterShell(V::ImageProcessingBC& bc, ShellFront& front) {
+    bc.select_biggest_componentBSFace();
+    std::vector<V::ImageProcessingBC::ShellVertex> verts;
+    bc.collect_outer_shell_front(front, verts);
+    return makeShell(verts);
+}
+
+// Selects component `componentId` as the current component. Returns true and
+// fills `shell` / `front` with its outer-loop vertices when it has a non-empty
+// outer loop; returns false (outputs untouched) otherwise.
+bool collectOuterShellOfComponent(V::ImageProcessingBC& bc, int componentId, ShellFront& front,
+                                  CTShell& shell) {
+    if (!bc.select_componentBSFace_by_id(componentId) ||
+        bc.get_n_outer_edges_of_biggest_component() <= 0)
+        return false;
+    std::vector<V::ImageProcessingBC::ShellVertex> verts;
+    bc.collect_outer_shell_front(front, verts);
+    shell = makeShell(verts);
+    return true;
+}
+
+// Next shell inward from `prevFront`: not-yet-visited end points of the
+// REGULAR / INTERIOR beta-edges incident to the previous shell's vertices.
+CTShell expandShell(V::ImageProcessingBC& bc, double beta, const ShellFront& prevFront,
+                    ShellFront& newFront) {
+    std::vector<V::ImageProcessingBC::ShellVertex> verts;
+    bc.expand_shell_front(beta, prevFront, newFront, verts);
+    return makeShell(verts);
+}
+
+#else  // !SKINPEELER_HAVE_SHELL_FRONT
+
+using ShellFront = std::vector<V::QuasiVertex>;
+
+// Adds the not-yet-visited end points of `edge` to `shell` / `front` and marks
+// them visited.
+template <typename Edge>
+void addUnvisitedEndPoints(Edge& edge, CTShell& shell, ShellFront& front) {
+    auto sv = edge.get_start_quasi_vertex();
+    auto ev = edge.get_end_quasi_vertex();
+
+    if (!sv.is_visited()) {
+        sv.set_visited(true);
+        auto pt = sv.get_point();
+        shell.addVertex(pt.getX(), pt.getY(), sv.get_radius());
+        front.push_back(std::move(sv));
+    }
+    if (!ev.is_visited()) {
+        ev.set_visited(true);
+        auto pt = ev.get_point();
+        shell.addVertex(pt.getX(), pt.getY(), ev.get_radius());
+        front.push_back(std::move(ev));
+    }
+}
+
+// Shell[0] of the biggest component (selection score): its outer-loop
+// vertices. `front` receives the vertex handles.
+CTShell collectOuterShell(V::ImageProcessingBC& bc, ShellFront& front) {
+    auto outerEdges = bc.get_edge_of_outer_loop_of_biggest_componentBSFace();
+    CTShell shell;
+    front.clear();
+    for (auto& edge : outerEdges)
+        addUnvisitedEndPoints(edge, shell, front);
+    return shell;
+}
+
+// Selects component `componentId` as the current component. Returns true and
+// fills `shell` / `front` with its outer-loop vertices when it has a non-empty
+// outer loop; returns false (outputs untouched) otherwise.
+bool collectOuterShellOfComponent(V::ImageProcessingBC& bc, int componentId, ShellFront& front,
+                                  CTShell& shell) {
+    auto outerEdges = bc.get_edge_of_outer_loop_of_componentBSFace(componentId);
+    if (outerEdges.empty())
+        return false;
+    CTShell newShell;
+    front.clear();
+    for (auto& edge : outerEdges)
+        addUnvisitedEndPoints(edge, newShell, front);
+    shell = std::move(newShell);
+    return true;
+}
+
+// Next shell inward from `prevFront`: not-yet-visited end points of the
+// REGULAR / INTERIOR beta-edges incident to the previous shell's vertices.
+CTShell expandShell(V::ImageProcessingBC& /*bc*/, double beta, const ShellFront& prevFront,
+                    ShellFront& newFront) {
+    CTShell newShell;
+    newFront.clear();
+    for (const auto& vert : prevFront) {
+        V::QuasiVertex v = vert;
+        auto incEdges = v.find_incident_quasi_edges();
+
+        for (auto& edge : incEdges) {
+            int state = edge.get_bounding_state(beta);
+            if (state == V::REGULAR_STATE || state == V::INTERIOR_STATE)
+                addUnvisitedEndPoints(edge, newShell, newFront);
+        }
+    }
+    return newShell;
+}
+
+#endif  // SKINPEELER_HAVE_SHELL_FRONT
+
+}  // namespace
+
+// =============================================================================
+// Internal Voronoi wrapper  (keeps V headers out of CTImage.h)
+// Holds the outer-shell front so that calculateInnerShellsAdaptive() can use
+// it as the seed of the inward traversal.
+// =============================================================================
 struct CTImage::VoronoiImpl {
     V::ImageProcessingBC bc;
-    std::vector<V::QuasiVertex> outerShellQVerts;  // populated by extractOuterShell()
+    ShellFront outerShellFront;  // populated by extractOuterShell()
+    // True once a shell traversal has marked vertices visited on this
+    // structure: the next evaluation (another beta in sweepBetas()) must clear
+    // the vertex visited flags first.
+    bool traversed = false;
 };
 
 // =============================================================================
@@ -241,13 +390,17 @@ void CTImage::normalizeToMax(double globalMax) {
 
 void CTImage::setBeta(double b) {
     m_beta = std::max(0.0, std::min(1.0, b));
-    m_shells.clear();
     m_voronoi.reset();
 
-    // All of the following are derived from m_shells/the beta-complex built
-    // above, so they go stale the moment beta changes and must be recomputed
-    // by the next calculateShells() call. Leaving them behind previously let
-    // callers read peel/cut/bed state computed under the OLD beta.
+    // Everything derived from the beta-complex goes stale the moment beta
+    // changes and must be recomputed by the next calculateShells() call.
+    // Leaving it behind previously let callers read peel/cut/bed state
+    // computed under the OLD beta.
+    clearDerivedState();
+}
+
+void CTImage::clearDerivedState() {
+    m_shells.clear();
     m_peelIndex = 0;
     m_algoPeelIndex = 0;
     m_peeled = false;
@@ -255,16 +408,29 @@ void CTImage::setBeta(double b) {
     m_shellInside.clear();
     m_mahalFit = MahalFit{};
     m_bedResult = BedDetector::Result{};
+    m_cutRule = CutRule::Unknown;
+    m_componentSummary = ComponentSummary{};
 }
 
 // =============================================================================
-// buildAndClassifyVoronoi  — shared Voronoi-construction step (S2)
-//
-// Common to calculateShells() and computeBiggestComponentMask(): transpose
-// image to column-major, read BitsStored, constructForImageProcessing16bit,
-// set_beta_value, classifyByComponents. Allocates m_voronoi.
+// calculateShells  — main entry point for Voronoi + shell extraction
+// Always extracts all reachable shells (maximize mode). See CTImage.h for rationale.
 // =============================================================================
-void CTImage::buildAndClassifyVoronoi() {
+void CTImage::calculateShells() {
+    m_timedOut = false;
+    try {
+        buildVoronoi();
+        evaluateCurrentBeta();
+    } catch (const std::exception& e) {
+        throw VoronoiError(std::string(ErrorMessages::SHELL_CALC_ERROR) + ": " + e.what());
+    }
+}
+
+// =============================================================================
+// buildVoronoi — beta-independent Voronoi / quasi-triangulation construction
+// (~1.7 s, ~340 MB). Replaces any existing structure.
+// =============================================================================
+void CTImage::buildVoronoi() {
     m_voronoi = std::make_unique<VoronoiImpl>();
     V::ImageProcessingBC& bc = m_voronoi->bc;
 
@@ -282,172 +448,324 @@ void CTImage::buildAndClassifyVoronoi() {
     const int bitsStoredInt = static_cast<int>(bitsStored);
 
     bc.constructForImageProcessing16bit(colorDataSet, bitsStoredInt, DARKER_PIXEL_BIGGER_DISK);
-    bc.set_beta_value(m_beta);
-    bc.classifyByComponents();
 }
 
 // =============================================================================
-// calculateShells  — main entry point for Voronoi + shell extraction
-// Always extracts all reachable shells (maximize mode). See CTImage.h for rationale.
+// evaluateCurrentBeta — everything that depends on beta, on the Voronoi
+// structure built by buildVoronoi(): component classification/selection,
+// optional bed removal, shell extraction, cutting rule.
+// Shared by calculateShells() (one beta) and sweepBetas() (many betas).
+// May throw; callers translate/handle.
 // =============================================================================
-void CTImage::calculateShells() {
-    m_timedOut = false;
-    try {
-        // Build Voronoi / beta-complex (shared with computeBiggestComponentMask())
-        buildAndClassifyVoronoi();
-        V::ImageProcessingBC& bc = m_voronoi->bc;
+void CTImage::evaluateCurrentBeta() {
+    assert(m_voronoi);
+    V::ImageProcessingBC& bc = m_voronoi->bc;
 
-        m_shells.clear();
-        extractOuterShell();
+    bc.set_beta_value(m_beta);
+    bc.classifyByComponents();
 
-        // =====================================================================
-        // Bed removal hook (inserted after extractOuterShell, before inner shells)
-        // Only active when m_bedRemovalEnabled == true.
-        // When disabled: this block is never entered → existing code path 100% unchanged.
-        // =====================================================================
-        if (m_bedRemovalEnabled) {
-            // --- Cache lookup ---
-            std::string cacheDir = m_specimenDir.empty()
-                                       ? std::filesystem::path(m_filepath).parent_path().string()
-                                       : m_specimenDir;
+    // A previous evaluation on this structure left vertex visited flags
+    // set (classifyByComponents() resets face flags only).
+    if (m_voronoi->traversed)
+        bc.reset_vertex_visited();
+    m_voronoi->traversed = true;
 
-            bool cacheHit = false;
-            if (BedCache::exists(cacheDir, m_beta, BedCache::ALGORITHM_VERSION)) {
-                cacheHit = BedCache::load(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath,
-                                          m_bedResult);
-            }
+    m_shells.clear();
+    extractOuterShell();
 
-            // enumerate_components() is called exactly once per calculateShells()
-            // invocation (score-descending; index 0 = current body0), regardless
-            // of cache hit/miss. Needed below both for BedDetector input (on a
-            // cache miss) and for current_body0_id (always, to detect a change).
-            auto vd_comps_raw = bc.enumerate_components();
-            int current_body0_id = vd_comps_raw.empty() ? -1 : vd_comps_raw[0].id;
+    // =====================================================================
+    // Bed removal hook (inserted after extractOuterShell, before inner shells)
+    // Only active when m_bedRemovalEnabled == true.
+    // When disabled: this block is never entered → existing code path 100% unchanged.
+    // =====================================================================
+    if (m_bedRemovalEnabled) {
+        // --- Cache lookup ---
+        std::string cacheDir = m_specimenDir.empty()
+                                   ? std::filesystem::path(m_filepath).parent_path().string()
+                                   : m_specimenDir;
 
-            if (!cacheHit) {
-                // --- No cache: run BedDetector ---
-                // Convert ImageProcessingBC::ComponentInfo → BedDetector::VDComponentInfo
-                std::vector<BedDetector::VDComponentInfo> vd_comps;
-                vd_comps.reserve(vd_comps_raw.size());
-                for (const auto& ci : vd_comps_raw) {
-                    BedDetector::VDComponentInfo vi;
-                    vi.id = ci.id;
-                    vi.centroid_x = ci.centroid_x;
-                    vi.centroid_y = ci.centroid_y;
-                    vi.area = ci.area;
-                    vi.circularity = ci.circularity;
-                    vi.score = ci.score;
-                    vd_comps.push_back(vi);
-                }
-
-                // body0_cy: mean y of shell[0] vertices (Voronoi space)
-                double body0_cy = 0.0;
-                if (!m_shells.empty() && !m_shells[0].isEmpty()) {
-                    for (const auto& v : m_shells[0])
-                        body0_cy += v.y;
-                    body0_cy /= static_cast<double>(m_shells[0].size());
-                }
-
-                BedDetector bd;
-                m_bedResult = bd.detect(vd_comps, m_image.data(), m_width, m_height, body0_cy,
-                                        BedDetector::Params{});
-
-                // Cache save (single slice upsert)
-                BedCache::save(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath,
-                               m_bedResult);
-            }
-
-            // --- body0 replacement ---
-            const int new_id = m_bedResult.new_body0_component_id;
-
-            if (new_id != -1 && new_id != current_body0_id) {
-                auto new_outer_edges = bc.get_edge_of_outer_loop_of_componentBSFace(new_id);
-                if (!new_outer_edges.empty()) {
-                    // Rebuild shell[0] and outerShellQVerts from new outer loop
-                    m_shells.clear();
-                    m_voronoi->outerShellQVerts.clear();
-
-                    CTShell newShell;
-                    for (auto& edge : new_outer_edges) {
-                        auto sv = edge.get_start_quasi_vertex();
-                        auto ev = edge.get_end_quasi_vertex();
-
-                        if (!sv.is_visited()) {
-                            sv.set_visited(true);
-                            auto pt = sv.get_point();
-                            newShell.addVertex(pt.getX(), pt.getY(), sv.get_radius());
-                            m_voronoi->outerShellQVerts.push_back(sv);
-                        }
-                        if (!ev.is_visited()) {
-                            ev.set_visited(true);
-                            auto pt = ev.get_point();
-                            newShell.addVertex(pt.getX(), pt.getY(), ev.get_radius());
-                            m_voronoi->outerShellQVerts.push_back(ev);
-                        }
-                    }
-                    newShell.calculateStatistics();
-                    m_shells.push_back(std::move(newShell));
-                }
-                // m_image not modified, VD not rebuilt
-            }
+        bool cacheHit = false;
+        if (BedCache::exists(cacheDir, m_beta, BedCache::ALGORITHM_VERSION)) {
+            cacheHit = BedCache::load(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath,
+                                      m_bedResult);
         }
-        // =====================================================================
-        // End bed removal hook
-        // =====================================================================
 
-        calculateInnerShellsAdaptive(true);
-        m_algoPeelIndex = calculateCuttingShell();
-        m_peelIndex = m_algoPeelIndex;
+        // enumerate_components() is called exactly once per calculateShells()
+        // invocation (score-descending; index 0 = current body0), regardless
+        // of cache hit/miss. Needed below both for BedDetector input (on a
+        // cache miss) and for current_body0_id (always, to detect a change).
+        auto vd_comps_raw = bc.enumerate_components();
+        int current_body0_id = vd_comps_raw.empty() ? -1 : vd_comps_raw[0].id;
 
+        if (!cacheHit) {
+            // --- No cache: run BedDetector ---
+            // Convert ImageProcessingBC::ComponentInfo → BedDetector::VDComponentInfo
+            std::vector<BedDetector::VDComponentInfo> vd_comps;
+            vd_comps.reserve(vd_comps_raw.size());
+            for (const auto& ci : vd_comps_raw) {
+                BedDetector::VDComponentInfo vi;
+                vi.id = ci.id;
+                vi.centroid_x = ci.centroid_x;
+                vi.centroid_y = ci.centroid_y;
+                vi.area = ci.area;
+                vi.circularity = ci.circularity;
+                vi.score = ci.score;
+                vd_comps.push_back(vi);
+            }
+
+            // body0_cy: mean y of shell[0] vertices (Voronoi space)
+            double body0_cy = 0.0;
+            if (!m_shells.empty() && !m_shells[0].isEmpty()) {
+                for (const auto& v : m_shells[0])
+                    body0_cy += v.y;
+                body0_cy /= static_cast<double>(m_shells[0].size());
+            }
+
+            BedDetector bd;
+            m_bedResult = bd.detect(vd_comps, m_image.data(), m_width, m_height, body0_cy,
+                                    BedDetector::Params{});
+
+            // Cache save (single slice upsert)
+            BedCache::save(cacheDir, m_beta, BedCache::ALGORITHM_VERSION, m_filepath, m_bedResult);
+        }
+
+        // --- body0 replacement ---
+        const int new_id = m_bedResult.new_body0_component_id;
+
+        if (new_id != -1 && new_id != current_body0_id) {
+            // Selects the component (also when its outer loop turns out to
+            // be empty); shell[0] and the outer front are rebuilt only for a
+            // non-empty outer loop.
+            CTShell newShell;
+            if (collectOuterShellOfComponent(bc, new_id, m_voronoi->outerShellFront, newShell)) {
+                m_shells.clear();
+                newShell.calculateStatistics();
+                m_shells.push_back(std::move(newShell));
+            }
+            // m_image not modified, VD not rebuilt
+        }
+    }
+    // =====================================================================
+    // End bed removal hook
+    // =====================================================================
+
+    recordComponentSummary();
+
+    calculateInnerShellsAdaptive(true);
+    m_algoPeelIndex = calculateCuttingShell();
+    m_peelIndex = m_algoPeelIndex;
+}
+
+void CTImage::recordComponentSummary() {
+    V::ImageProcessingBC& bc = m_voronoi->bc;
+    m_componentSummary.valid = true;
+    m_componentSummary.nInnerLoops = bc.get_n_inner_loops_of_biggest_component();
+    m_componentSummary.nComponents = bc.get_n_components();
+    m_componentSummary.area = bc.get_area_of_biggest_component();
+    m_componentSummary.outerCircularity = bc.get_outer_circularity_of_biggest_component();
+}
+
+// =============================================================================
+// sweepBetas — one Voronoi structure, many betas (see CTImage.h)
+// =============================================================================
+void CTImage::sweepBetas(const std::vector<double>& betas, const BetaCallback& onBeta) {
+    if (betas.empty())
+        return;
+
+    // Release the Voronoi structure on every exit path (including a throwing
+    // callback).
+    struct VoronoiReleaser {
+        CTImage& self;
+        ~VoronoiReleaser() {
+            self.m_voronoi.reset();
+        }
+    } releaser{*this};
+
+    try {
+        buildVoronoi();
     } catch (const std::exception& e) {
         throw VoronoiError(std::string(ErrorMessages::SHELL_CALC_ERROR) + ": " + e.what());
     }
+
+    for (double b : betas) {
+        m_beta = std::max(0.0, std::min(1.0, b));  // same clamp as setBeta()
+        clearDerivedState();
+        m_timedOut = false;
+
+        BetaEvaluation ev;
+        try {
+            evaluateCurrentBeta();
+            ev = summarizeEvaluation();
+            ev.ok = true;
+        } catch (const std::exception& e) {
+            clearDerivedState();
+            ev = BetaEvaluation{};
+            ev.beta = m_beta;
+            ev.ok = false;
+            ev.error = std::string(ErrorMessages::SHELL_CALC_ERROR) + ": " + e.what();
+        }
+        if (onBeta)
+            onBeta(ev);
+    }
+}
+
+CTImage::BetaEvaluation CTImage::summarizeEvaluation() const {
+    BetaEvaluation ev;
+    ev.beta = m_beta;
+    ev.ok = true;
+    ev.component = m_componentSummary;
+    ev.cut = m_algoPeelIndex;
+    ev.cutRule = m_cutRule;
+    ev.fit = m_mahalFit;
+    ev.timedOut = m_timedOut;
+    ev.judgeable = judgeable();
+    ev.b2Contrast = b2Contrast();
+
+    const int n = static_cast<int>(m_shells.size());
+    ev.shells.resize(n);
+    for (int i = 0; i < n; ++i) {
+        ShellSummary& sh = ev.shells[i];
+        sh.mu = m_shells[i].mu();
+        sh.sigma = m_shells[i].sigma();
+        sh.nVertices = static_cast<int>(m_shells[i].size());
+        sh.hasStatistics = m_shells[i].hasStatistics();
+        // Convention of the cutting rules: -1 = shell not scored.
+        if (i < static_cast<int>(m_shellMahalD.size()) && m_shellMahalD[i] >= 0.0) {
+            sh.hasMahal = true;
+            sh.mahalD = m_shellMahalD[i];
+            sh.mahalD2 = sh.mahalD * sh.mahalD;  // same squaring the BIC changepoint uses
+        }
+        sh.inside = (i < static_cast<int>(m_shellInside.size())) ? m_shellInside[i] : false;
+    }
+    return ev;
+}
+
+double CTImage::b2Contrast() const {
+    if (!m_mahalFit.active)
+        return std::numeric_limits<double>::quiet_NaN();
+    // The fit is on S2..Sm: m_shells index (offset + 1) onward, where offset
+    // is the index of S1.
+    const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
+    return BetaSelection::b2SeparationContrast(m_shellMahalD, m_algoPeelIndex, offset + 1);
+}
+
+const char* CTImage::cutRuleName(CutRule rule) {
+    switch (rule) {
+        case CutRule::Unknown:
+            return "UNKNOWN";
+        case CutRule::None:
+            return "NONE";
+        case CutRule::MahalBic:
+            return "MAHAL_BIC";
+        case CutRule::ThreeSigma:
+            return "THREE_SIGMA";
+        case CutRule::Euclidean:
+            return "EUCLIDEAN";
+        case CutRule::EuclideanFallback:
+            return "EUCLIDEAN_FALLBACK";
+    }
+    return "UNKNOWN";
+}
+
+const char* CTImage::cuttingAlgorithmName(CuttingAlgorithm algo) {
+    switch (algo) {
+        case CuttingAlgorithm::THREE_SIGMA:
+            return "THREE_SIGMA";
+        case CuttingAlgorithm::GMM:
+            return "GMM";
+        case CuttingAlgorithm::EUCLIDEAN:
+            return "EUCLIDEAN";
+        case CuttingAlgorithm::MAHAL_BIC:
+            return "MAHAL_BIC";
+    }
+    return "UNKNOWN";
+}
+
+bool CTImage::selectionUsesOuterLoopCircularity() {
+    return V::ImageProcessingBC::get_use_outer_loop_circularity();
+}
+
+// =============================================================================
+// shellMask / skinMask — rasterize shell vertices to a pixel mask
+// =============================================================================
+std::vector<uint8_t> CTImage::shellMask(int firstShell, int lastShell) const {
+    std::vector<uint8_t> mask(static_cast<size_t>(m_height) * static_cast<size_t>(m_width), 0);
+    const int nShells = static_cast<int>(m_shells.size());
+    const int lo = std::max(0, firstShell);
+    const int hi = std::min(lastShell, nShells - 1);
+    for (int si = lo; si <= hi; ++si) {
+        for (const auto& v : m_shells[si]) {
+            auto [row, col] = CoordinateTransform::voronoiToImagePixel(v.x, v.y, m_height, m_width);
+            if (CoordinateTransform::isValidPixel(row, col, m_height, m_width))
+                mask[static_cast<size_t>(row) * m_width + col] = 1;
+        }
+    }
+    return mask;
+}
+
+std::vector<uint8_t> CTImage::skinMask(int cut) const {
+    return shellMask(0, cut >= 0 ? cut : m_peelIndex);
+}
+
+// =============================================================================
+// noAirMasks — air-excluded skin mask and air mask (definition in CTImage.h)
+// =============================================================================
+CTImage::NoAirMasks CTImage::noAirMasks(int cut) const {
+    NoAirMasks out;
+    const size_t nPixels = static_cast<size_t>(m_height) * static_cast<size_t>(m_width);
+
+    const std::vector<uint8_t> s0 = shellMask(0, 0);
+    const std::vector<uint8_t> cutMsk = skinMask(cut);
+
+    // T = max intensity over S0 pixels; -infinity when S0 is empty.
+    double threshold = -std::numeric_limits<double>::infinity();
+    for (size_t i = 0; i < nPixels; ++i) {
+        if (s0[i]) {
+            ++out.nS0Pixels;
+            threshold = std::max(threshold, static_cast<double>(m_image[i]));
+        }
+    }
+    out.s0Empty = (out.nS0Pixels == 0);
+    out.airThreshold = threshold;
+
+    out.skin.assign(nPixels, 0);
+    out.air.assign(nPixels, 0);
+    for (size_t i = 0; i < nPixels; ++i) {
+        const bool keep = static_cast<double>(m_image[i]) > threshold;
+        if (cutMsk[i] && !s0[i] && keep) {
+            out.skin[i] = 1;
+            ++out.nSkinPixels;
+        }
+        if (s0[i] || !keep) {
+            out.air[i] = 1;
+            ++out.nAirPixels;
+        }
+    }
+    return out;
 }
 
 // =============================================================================
 // extractOuterShell
-// Calls get_edge_of_outer_loop_of_biggest_componentBSFace() exactly once.
-// Collected QuasiVertex objects are cached in m_voronoi->outerShellQVerts so
-// that calculateInnerShellsAdaptive() can use them as seeds without repeating
-// the expensive biggest-component search.
+// Selects the biggest component (selection score) and collects its outer-loop
+// vertices as shell[0]. The vertex handles are kept in
+// m_voronoi->outerShellFront so that calculateInnerShellsAdaptive() can use
+// them as seeds.
 // =============================================================================
 void CTImage::extractOuterShell() {
     assert(m_voronoi);
-    V::ImageProcessingBC& bc = m_voronoi->bc;
 
-    auto outerEdges = bc.get_edge_of_outer_loop_of_biggest_componentBSFace();
-
-    CTShell shell;
-    m_voronoi->outerShellQVerts.clear();
-
-    for (auto& edge : outerEdges) {
-        auto sv = edge.get_start_quasi_vertex();
-        auto ev = edge.get_end_quasi_vertex();
-
-        if (!sv.is_visited()) {
-            sv.set_visited(true);
-            auto pt = sv.get_point();
-            shell.addVertex(pt.getX(), pt.getY(), sv.get_radius());
-            m_voronoi->outerShellQVerts.push_back(sv);
-        }
-        if (!ev.is_visited()) {
-            ev.set_visited(true);
-            auto pt = ev.get_point();
-            shell.addVertex(pt.getX(), pt.getY(), ev.get_radius());
-            m_voronoi->outerShellQVerts.push_back(ev);
-        }
-    }
+    CTShell shell = collectOuterShell(m_voronoi->bc, m_voronoi->outerShellFront);
     shell.calculateStatistics();
     m_shells.push_back(std::move(shell));
 }
 
 // =============================================================================
-// calculateInnerShellsAdaptive
-// Shell calculation using stored QuasiVertex references for traversal.
+// calculateInnerShellsAdaptive — inward shell traversal from the outer front
 // =============================================================================
 void CTImage::calculateInnerShellsAdaptive(bool maximize) {
     if (!m_voronoi)
         return;
+    V::ImageProcessingBC& bc = m_voronoi->bc;
 
     // Time limit safety: record start time
     const auto calcStartTime = std::chrono::steady_clock::now();
@@ -456,9 +774,9 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize) {
         return std::chrono::duration<double>(now - calcStartTime).count();
     };
 
-    // Use the outer-shell QuasiVertex list cached by extractOuterShell().
-    // Ping-pong: only keep the previous shell's QVerts as seeds for the next.
-    std::vector<V::QuasiVertex> prevQVerts = m_voronoi->outerShellQVerts;
+    // Use the outer-shell front cached by extractOuterShell().
+    // Ping-pong: only keep the previous shell's front as seeds for the next.
+    ShellFront prevFront = m_voronoi->outerShellFront;
 
     // Incremental shell statistics for adaptive stopping (avoid repeated full traversal)
     std::vector<std::pair<double, double>> statsPoints;
@@ -471,55 +789,29 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize) {
             statsPoints.emplace_back(sh.mu(), sh.sigma());
     }
 
-    // Shared lambda: expand one shell from prevQVerts
-    auto expandOneShell = [&](std::vector<V::QuasiVertex>& newQVerts) -> CTShell {
-        CTShell newShell;
-        for (const auto& vert : prevQVerts) {
-            V::QuasiVertex v = vert;
-            auto incEdges = v.find_incident_quasi_edges();
-
-            for (auto& edge : incEdges) {
-                int state = edge.get_bounding_state(m_beta);
-                if (state == V::REGULAR_STATE || state == V::INTERIOR_STATE) {
-                    auto sv = edge.get_start_quasi_vertex();
-                    auto ev = edge.get_end_quasi_vertex();
-
-                    if (!sv.is_visited()) {
-                        sv.set_visited(true);
-                        auto pt = sv.get_point();
-                        newShell.addVertex(pt.getX(), pt.getY(), sv.get_radius());
-                        newQVerts.push_back(std::move(sv));
-                    }
-                    if (!ev.is_visited()) {
-                        ev.set_visited(true);
-                        auto pt = ev.get_point();
-                        newShell.addVertex(pt.getX(), pt.getY(), ev.get_radius());
-                        newQVerts.push_back(std::move(ev));
-                    }
-                }
-            }
-        }
-        return newShell;
+    // Shared lambda: expand one shell from prevFront
+    auto expandOneShell = [&](ShellFront& newFront) -> CTShell {
+        return expandShell(bc, m_beta, prevFront, newFront);
     };
 
     // Calculate minimum shells first
     for (int i = static_cast<int>(m_shells.size()); i < ADAPTIVE_SHELL_MIN; ++i) {
-        if (prevQVerts.empty())
+        if (prevFront.empty())
             break;
         if (elapsedSeconds() > ADAPTIVE_TIME_LIMIT_SECONDS) {
             m_timedOut = true;
             break;
         }
 
-        std::vector<V::QuasiVertex> newQVerts;
-        CTShell newShell = expandOneShell(newQVerts);
+        ShellFront newFront;
+        CTShell newShell = expandOneShell(newFront);
 
         if (!newShell.isEmpty()) {
             newShell.calculateStatistics();
             if (newShell.hasStatistics())
                 statsPoints.emplace_back(newShell.mu(), newShell.sigma());
             m_shells.push_back(std::move(newShell));
-            prevQVerts = std::move(newQVerts);
+            prevFront = std::move(newFront);
         } else {
             break;
         }
@@ -530,11 +822,11 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize) {
 
     for (int shellIdx = static_cast<int>(m_shells.size()); shellIdx < ADAPTIVE_SHELL_MAX;
          ++shellIdx) {
-        if (prevQVerts.empty())
+        if (prevFront.empty())
             break;
 
-        std::vector<V::QuasiVertex> newQVerts;
-        CTShell newShell = expandOneShell(newQVerts);
+        ShellFront newFront;
+        CTShell newShell = expandOneShell(newFront);
 
         if (newShell.isEmpty())
             break;
@@ -549,7 +841,7 @@ void CTImage::calculateInnerShellsAdaptive(bool maximize) {
         if (newShell.hasStatistics())
             statsPoints.emplace_back(newShell.mu(), newShell.sigma());
         m_shells.push_back(std::move(newShell));
-        prevQVerts = std::move(newQVerts);
+        prevFront = std::move(newFront);
 
         // Check adaptive stopping every N shells (using incremental statsPoints)
         if (shellIdx % ADAPTIVE_CHECK_INTERVAL == 0 && statsPoints.size() >= 4) {
@@ -700,10 +992,12 @@ std::vector<char> CTImage::extractComponentMaskById(int component_id) {
 // =============================================================================
 std::vector<char> CTImage::computeBiggestComponentMask() {
     try {
-        // Build Voronoi / beta-complex (shared with calculateShells())
-        buildAndClassifyVoronoi();
+        // Build Voronoi / beta-complex (same construction as calculateShells())
+        buildVoronoi();
         V::ImageProcessingBC& bc = m_voronoi->bc;
 
+        bc.set_beta_value(m_beta);
+        bc.classifyByComponents();
         bc.select_biggest_componentBSFace();
 
         // Build H*W pixel mask
@@ -746,27 +1040,39 @@ void CTImage::releaseRawDicom() {
 // Cutting point detection
 // =============================================================================
 int CTImage::calculateCuttingShell(CuttingAlgorithm algo) {
-    if (m_shells.size() < 2)
+    if (m_shells.size() < 2) {
+        m_cutRule = CutRule::None;
         return 0;
+    }
 
     try {
         switch (algo) {
             case CuttingAlgorithm::THREE_SIGMA:
+                m_cutRule = CutRule::ThreeSigma;
                 return cutting3SigmaDistance();
-            case CuttingAlgorithm::MAHAL_BIC:
-                return cuttingMahalBic();
+            case CuttingAlgorithm::MAHAL_BIC: {
+                const int cutIndex = cuttingMahalBic();
+                // cuttingMahalBic() falls back to the Euclidean rule when there
+                // are too few shells for the fit (m_mahalFit.active stays false).
+                m_cutRule = m_mahalFit.active ? CutRule::MahalBic : CutRule::EuclideanFallback;
+                return cutIndex;
+            }
             case CuttingAlgorithm::GMM:
+                m_cutRule = CutRule::Euclidean;
                 return cuttingGmmSequential();
             case CuttingAlgorithm::EUCLIDEAN:
+                m_cutRule = CutRule::Euclidean;
                 return cuttingEuclideanDistance();
         }
     } catch (...) {
+        m_cutRule = CutRule::EuclideanFallback;
         std::fprintf(stderr,
                      "CTImage::calculateCuttingShell: cutting algorithm %d threw, "
                      "falling back to Euclidean distance\n",
                      static_cast<int>(algo));
         return cuttingEuclideanDistance();
     }
+    m_cutRule = CutRule::EuclideanFallback;
     return cuttingEuclideanDistance();
 }
 

@@ -11,7 +11,7 @@ project(SKINPEELER VERSION 2.0 LANGUAGES CXX)
 #
 # V-ImageProcessing (third-party Voronoi/beta-complex library):
 #   By default this project links the prebuilt static library and headers
-#   bundled under third_party/v_imageprocessing/ (Linux x86_64 only for now).
+#   bundled under third_party/v_imageprocessing/.
 #   Prebuilt libraries are bundled for Linux (GCC) and Windows (MSVC x64).
 #   Building against a different V-ImageProcessing checkout instead requires
 #   -DV_IP_SOURCE_ROOT pointing at an internal
@@ -110,6 +110,7 @@ if(DEFINED V_IP_SOURCE_ROOT)
     endif()
 
     set(V_IMAGEPROCESSING_TARGET V_2D)
+    set(SKINPEELER_V_IP_HAS_SHELL_FRONT_SOURCE "${V_API_ROOT}/include/ImageProcessingBC.h")
 else()
     # ---- Public path: prebuilt binary + headers ----------------------------
     set(V_IP_ROOT "${CMAKE_SOURCE_DIR}/third_party/v_imageprocessing")
@@ -125,8 +126,8 @@ else()
     if(NOT EXISTS "${V_IP_LIB}")
         message(FATAL_ERROR
             "SKINPEELER: prebuilt V-ImageProcessing library not found at "
-            "${V_IP_LIB}. On Windows this is expected (not yet bundled — "
-            "see third_party/v_imageprocessing/NOTICE.md). Either obtain a "
+            "${V_IP_LIB} (see third_party/v_imageprocessing/NOTICE.md). "
+            "Either obtain a "
             "prebuilt library for your platform, or (lab-internal) pass "
             "-DV_IP_SOURCE_ROOT=<path-to-V-ImageProcessing-source-checkout> to build from "
             "source.")
@@ -143,7 +144,47 @@ else()
     target_compile_features(V_2D INTERFACE cxx_std_17)
 
     set(V_IMAGEPROCESSING_TARGET V_2D)
+    set(SKINPEELER_V_IP_HAS_SHELL_FRONT_SOURCE "${V_IP_LIB}")
 endif()
+
+# =============================================================================
+# Shell-front primitives of V-ImageProcessing
+# =============================================================================
+# ImageProcessingBC::collect_outer_shell_front / expand_shell_front /
+# select_componentBSFace_by_id traverse shells on the raw Voronoi vertices
+# without allocating wrapper objects. The engine uses them when the linked
+# library provides them (SKINPEELER_HAVE_SHELL_FRONT=1) and the QuasiVertex /
+# QuasiEdge wrapper traversal otherwise (=0); both give the same shells.
+#
+# Detection: the function name is searched in the prebuilt library (or, for a
+# source build, in the library header).
+#
+# -DSKINPEELER_SHELL_FRONT=ON|OFF overrides the detection (AUTO by default).
+set(SKINPEELER_SHELL_FRONT "AUTO" CACHE STRING
+    "Use the V-ImageProcessing shell-front primitives: AUTO (detect), ON, OFF")
+set_property(CACHE SKINPEELER_SHELL_FRONT PROPERTY STRINGS AUTO ON OFF)
+
+if(SKINPEELER_SHELL_FRONT STREQUAL "AUTO")
+    file(STRINGS "${SKINPEELER_V_IP_HAS_SHELL_FRONT_SOURCE}" _shell_front_hits
+         REGEX "expand_shell_front" LIMIT_COUNT 1)
+    if(_shell_front_hits)
+        set(SKINPEELER_HAVE_SHELL_FRONT 1)
+    else()
+        set(SKINPEELER_HAVE_SHELL_FRONT 0)
+    endif()
+elseif(SKINPEELER_SHELL_FRONT)
+    set(SKINPEELER_HAVE_SHELL_FRONT 1)
+else()
+    set(SKINPEELER_HAVE_SHELL_FRONT 0)
+endif()
+
+if(SKINPEELER_HAVE_SHELL_FRONT)
+    message(STATUS "SKINPEELER: V-ImageProcessing shell-front primitives: available")
+else()
+    message(STATUS "SKINPEELER: V-ImageProcessing shell-front primitives: not available "
+                   "-- using the wrapper traversal")
+endif()
+add_compile_definitions(SKINPEELER_HAVE_SHELL_FRONT=${SKINPEELER_HAVE_SHELL_FRONT})
 
 # =============================================================================
 # Qt6 (preferred) / Qt5 >= 5.13 fallback
@@ -189,12 +230,14 @@ set(DCMJPEG_LIBS "")  # merged into DCMTK_LINK_LIBS above
 set(SKINPEELER_ENGINE_SOURCES
     src/models/CTShell.cpp
     src/models/ShellStatistics.cpp
+    src/models/BetaSelection.cpp
     src/models/CTImage.cpp
     src/models/BedDetector.cpp
     src/models/BedCache.cpp
     src/services/DicomService.cpp
     src/services/PeelingService.cpp
     src/services/StatisticsService.cpp
+    src/engine/Session.cpp
 )
 
 set(SKINPEELER_GUI_SOURCES
@@ -209,12 +252,14 @@ set(SKINPEELER_HEADERS
     src/config/Settings.h
     src/models/CTShell.h
     src/models/ShellStatistics.h
+    src/models/BetaSelection.h
     src/models/CTImage.h
     src/models/BedDetector.h
     src/models/BedCache.h
     src/services/DicomService.h
     src/services/PeelingService.h
     src/services/StatisticsService.h
+    src/engine/Session.h
     src/utils/CoordinateTransform.h
     src/views/MainWindow.h
     src/views/SkinPeelerScene.h
@@ -274,6 +319,26 @@ add_skinpeeler_cli(exp_shell_pixel_export)
 add_skinpeeler_cli(exp_component_jaccard)
 add_skinpeeler_cli(exp_skin_mask_dump)
 add_skinpeeler_cli(check_shell0)
+
+# =============================================================================
+# SKINPEELER engine static library (no Qt)
+# Models + services + session flow (skinpeeler::Session), for programs that
+# link the engine as a library.
+# =============================================================================
+add_library(skinpeeler_core STATIC ${SKINPEELER_ENGINE_SOURCES})
+set_target_properties(skinpeeler_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(skinpeeler_core PUBLIC
+    "${CMAKE_SOURCE_DIR}/src"
+    "${DCMTK_INCLUDE_DIRS}"
+)
+target_link_libraries(skinpeeler_core PUBLIC
+    ${V_IMAGEPROCESSING_TARGET}
+    ${DCMTK_LINK_LIBS}
+)
+target_compile_features(skinpeeler_core PUBLIC cxx_std_17)
+if(WIN32)
+    target_compile_definitions(skinpeeler_core PRIVATE _USE_MATH_DEFINES NOMINMAX)
+endif()
 
 # =============================================================================
 # Install

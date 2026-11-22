@@ -34,6 +34,8 @@ add_executable(skinpeeler_tests
     test_peeling_service.cpp
     test_statistics_service.cpp
     test_engine_integration.cpp
+    test_beta_selection.cpp
+    test_engine_sweep.cpp
     ${SKINPEELER_ENGINE_SOURCES_ABS}
 )
 

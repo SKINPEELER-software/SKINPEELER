@@ -95,6 +95,26 @@ double gaussianLogLik(const double* x, int n, double mu, double sigma2);
 int bicChangepoint(const std::vector<double>& d2);
 
 // -------------------------------------------------------------------------
+// bicChangepointTerms — the quantities bicChangepoint() decides on.
+//   ic0     = BIC of H0 (single Gaussian)
+//   bestIc1 = smallest BIC over the two-segment splits, at split bestK
+//   changepoint = bicChangepoint()'s result (bestK, or -1 when H0 is not worse)
+// defined == false when m < 3 (nothing computed).
+// deltaBic() = ic0 - bestIc1 (BIC decisiveness; NaN when !defined).
+// -------------------------------------------------------------------------
+struct BicTerms {
+    bool defined = false;
+    double ic0 = std::numeric_limits<double>::quiet_NaN();
+    double bestIc1 = std::numeric_limits<double>::infinity();
+    int bestK = -1;
+    int changepoint = -1;
+    double deltaBic() const {
+        return defined ? ic0 - bestIc1 : std::numeric_limits<double>::quiet_NaN();
+    }
+};
+BicTerms bicChangepointTerms(const std::vector<double>& d2);
+
+// -------------------------------------------------------------------------
 // cutFromThreshold — first element with d <= tau is the first inside shell;
 // returns max(shellIndex(first inside) - 1, 1), or the last shell index if
 // no element is inside. `firstShellIndex` is the shell index of d[0].
