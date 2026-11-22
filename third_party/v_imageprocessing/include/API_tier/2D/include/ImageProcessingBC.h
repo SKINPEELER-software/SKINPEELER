@@ -179,6 +179,50 @@ class ImageProcessingBC : public BetaCplx {
     void extract_shell_radius_stats(double beta, int maxShells,
                                     std::vector<ShellRadiusStat>& shells_out);
 
+    // -------------------------------------------------------------------------
+    // Shell-front primitives (additive) — one shell step at a time, with vertex
+    // coordinates, on the raw Voronoi pointers.
+    //
+    // These perform exactly the traversal of the QuasiVertex / QuasiEdge wrapper
+    // loop (QuasiEdge::get_start_quasi_vertex / get_end_quasi_vertex,
+    // QuasiVertex::find_incident_quasi_edges, is_visited / set_visited,
+    // get_point, get_radius): same edge order, same vertex order, same skip
+    // rules (a virtual source vertex has no incident edges; virtual incident
+    // edges are skipped), same coordinate / radius source. They allocate no
+    // QT*2DCore wrapper objects, so they do not leak (see
+    // extract_shell_radius_stats above for the leak description).
+    //
+    // The caller owns the stepping loop (shell caps, time limit, statistics).
+    // Visited flags are NOT cleared here: call reset_vertex_visited() before
+    // re-traversing the same Voronoi structure at another beta.
+    // -------------------------------------------------------------------------
+    struct ShellVertex {
+        double x      = 0.0;   // Voronoi-space coordinate (VertexBU2D::getCoord)
+        double y      = 0.0;
+        double radius = 0.0;   // VertexBU2D::getCircle().getRadius()
+    };
+    typedef std::vector<VertexBU2D*> ShellFront;
+
+    // Select the component with the given id as the current ("biggest")
+    // component without building an edge list. Returns false (selection
+    // unchanged) if no component has that id.
+    bool select_componentBSFace_by_id(int component_id);
+
+    // Shell[0]: not-yet-visited vertices on the outer loop of the currently
+    // selected component, in outer-loop edge order (start vertex, then end
+    // vertex). Marks them visited. Outputs are cleared first. Returns false if
+    // no component is selected or it has no outer loop.
+    bool collect_outer_shell_front(ShellFront& front_out,
+                                   std::vector<ShellVertex>& vertices_out);
+
+    // Next shell: for every vertex of prev_front (in order), every incident
+    // REGULAR/INTERIOR beta-edge (in incidence order) contributes its
+    // not-yet-visited start and end vertices. Marks them visited. Outputs are
+    // cleared first.
+    void expand_shell_front(double beta, const ShellFront& prev_front,
+                            ShellFront& next_front,
+                            std::vector<ShellVertex>& vertices_out);
+
    private:
     void propagateComponent(FaceBU2D* seedFace);
 };
