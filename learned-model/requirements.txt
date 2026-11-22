@@ -1,0 +1,8 @@
+torch>=2.1
+numpy
+pydicom>=3.0
+pylibjpeg
+pylibjpeg-libjpeg
+pillow
+# only needed for src/train.py with model=resnet34 or model=mitb2
+segmentation-models-pytorch==0.3.4

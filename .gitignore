@@ -27,3 +27,7 @@ compile_commands.json
 # Exception: synthetic demo/test phantom DICOM series is intentionally
 # tracked (see sample_data/README.md -- not real patient/specimen data).
 !sample_data/**/*.dcm
+
+# Python
+__pycache__/
+*.pyc

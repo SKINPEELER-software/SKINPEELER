@@ -54,6 +54,11 @@ The method has been validated across multiple shark species in the
 companion publication above. See [`docs/algorithm.md`](docs/algorithm.md)
 for a description of the pipeline and parameters.
 
+**Follow-up experiment.** [`learned-model/`](learned-model/) contains a U-Net
+trained only on SKINPEELER outputs (no expert annotation), with its
+architecture, training setup, scores and weights. It shows that SKINPEELER
+can serve as a label generator for deep segmentation models.
+
 ## Features
 
 - Load a directory of DICOM slices (including JPEG Lossless–compressed
