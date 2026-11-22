@@ -173,6 +173,14 @@ flowchart LR
 | U-Net trained on 4 expert-annotated slices | 0.704 |
 | SAM / MedSAM / SAM 2.1, zero-shot | ≤ 0.178 |
 
+![U-Net block diagram: a five-stage encoder (32 to 512 channels, 512×512 down to 32×32), a decoder with bilinear upsampling, and skip connections at every resolution](learned-model/assets/unet_architecture.png)
+
+*The network from input to output. Each encoder stage halves the resolution
+with 2×2 max pooling and doubles the channels; each decoder stage upsamples
+bilinearly, concatenates the encoder feature map of the same resolution
+(skip connection), and applies two 3×3 convolutions. A 1×1 convolution
+produces the boundary-layer mask.*
+
 **Model.** Encoder–decoder U-Net written from scratch in PyTorch: 5 encoder
 stages with 32 base channels (32-64-128-256-512), two 3×3 convolutions with
 BatchNorm and ReLU per stage, bilinear upsampling in the decoder, and skip

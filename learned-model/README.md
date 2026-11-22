@@ -45,6 +45,16 @@ differences of about 0.02 are within run-to-run variation.
 
 Encoder–decoder U-Net written from scratch in PyTorch (`src/models.py`).
 
+![U-Net block diagram: a five-stage encoder (32 to 512 channels, 512×512 down to 32×32), a decoder with bilinear upsampling, and skip connections at every resolution](assets/unet_architecture.png)
+
+*The network from input to output. Each encoder stage halves the resolution
+with 2×2 max pooling and doubles the channels; each decoder stage upsamples
+bilinearly, concatenates the encoder feature map of the same resolution
+(skip connection), and applies two 3×3 convolutions. A 1×1 convolution
+produces the boundary-layer mask.*
+
+The figure is drawn by `tools/draw_architecture.py`.
+
 | Item | Value |
 | --- | --- |
 | Input | 1 channel, HU clipped to [-200, 800] and scaled to [0, 1] |
