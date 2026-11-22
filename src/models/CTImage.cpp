@@ -253,6 +253,7 @@ void CTImage::setBeta(double b) {
     m_peeled = false;
     m_shellMahalD.clear();
     m_shellInside.clear();
+    m_mahalFit = MahalFit{};
     m_bedResult = BedDetector::Result{};
 }
 
@@ -752,6 +753,8 @@ int CTImage::calculateCuttingShell(CuttingAlgorithm algo) {
         switch (algo) {
             case CuttingAlgorithm::THREE_SIGMA:
                 return cutting3SigmaDistance();
+            case CuttingAlgorithm::MAHAL_BIC:
+                return cuttingMahalBic();
             case CuttingAlgorithm::GMM:
                 return cuttingGmmSequential();
             case CuttingAlgorithm::EUCLIDEAN:
@@ -822,6 +825,44 @@ int CTImage::cutting3SigmaDistance() {
     }
     // shell[0] stays at default: mahal=-1, inside=false
 
+    return result.cuttingIndex;
+}
+
+int CTImage::cuttingMahalBic() {
+    auto points = extractShellStatistics();
+
+    const int nShells = static_cast<int>(m_shells.size());
+    m_shellMahalD.assign(nShells, -1.0);
+    m_shellInside.assign(nShells, false);
+    m_mahalFit = MahalFit{};
+
+    const int offset = EXCLUDE_OUTERMOST_SHELL ? 1 : 0;
+    auto result = ShellStatistics::cuttingMahalBic(points, offset);
+
+    if (!result.computed) {
+        // Fewer than 4 non-air shells (harness: too_few_shells, no cut defined).
+        // Keep the engine's pre-existing fallback for too-few shells.
+        return cuttingEuclideanDistance();
+    }
+
+    for (int i = 0; i < static_cast<int>(result.mahalDistances.size()); ++i) {
+        int shellIdx = i + offset;
+        if (shellIdx < nShells) {
+            m_shellMahalD[shellIdx] = result.mahalDistances[i];
+            m_shellInside[shellIdx] = result.inside[i];
+        }
+    }
+
+    m_mahalFit.active = true;
+    if (result.changepointFound) {
+        m_mahalFit.valid = true;
+        m_mahalFit.meanMu = result.meanMu;
+        m_mahalFit.meanSigma = result.meanSigma;
+        for (int r = 0; r < 2; ++r)
+            for (int c = 0; c < 2; ++c)
+                m_mahalFit.cov[r][c] = result.cov[r][c];
+        m_mahalFit.tau = result.tau;
+    }
     return result.cuttingIndex;
 }
 

@@ -489,8 +489,19 @@ void ScatterPlotWidget::paintEvent(QPaintEvent*) {
         yMax = std::max(yMax, sg);
     }
 
+    // Expand to include the tau ellipse bounding box (Mahalanobis + BIC mode)
+    if (m_tauMode) {
+        if (m_tau.valid) {
+            double eX = m_tau.tau * std::sqrt(std::max(m_tau.cov[0][0], 0.0));
+            double eY = m_tau.tau * std::sqrt(std::max(m_tau.cov[1][1], 0.0));
+            xMin = std::min(xMin, m_tau.meanMu - eX);
+            xMax = std::max(xMax, m_tau.meanMu + eX);
+            yMin = std::min(yMin, m_tau.meanSigma - eY);
+            yMax = std::max(yMax, m_tau.meanSigma + eY);
+        }
+    }
     // Expand to include 3-sigma ellipse bounding box
-    {
+    else {
         double mMu, mSg, cov[2][2];
         if (computeMeanCov(mMu, mSg, cov)) {
             double c00 = cov[0][0], c01 = cov[0][1], c11 = cov[1][1];
@@ -535,7 +546,11 @@ void ScatterPlotWidget::paintEvent(QPaintEvent*) {
 
     drawAxes(p, "Mean (mu)", "Std Dev (sigma)", xMin, xMax, yMin, yMax, QColor(248, 252, 248));
 
-    drawEllipse3Sigma(p);  // draw first so ellipses appear behind scatter points
+    // draw first so ellipses appear behind scatter points
+    if (m_tauMode)
+        drawEllipseTau(p);
+    else
+        drawEllipse3Sigma(p);
     drawScatter(p);
 
     m_painter = nullptr;
@@ -633,6 +648,60 @@ bool ScatterPlotWidget::computeMeanCov(double& meanMu, double& meanSg, double co
     cov[0][1] = cov[1][0] = c01 / div;
     cov[1][1] = c11 / div;
     return true;
+}
+
+void ScatterPlotWidget::drawEllipseTau(QPainter& p) const {
+    if (!m_tau.valid)
+        return;
+    double c00 = m_tau.cov[0][0], c01 = m_tau.cov[0][1], c11 = m_tau.cov[1][1];
+    if (c00 < 1e-12)
+        return;
+    double L11 = std::sqrt(c00);
+    double L21 = c01 / L11;
+    double L22_sq = c11 - L21 * L21;
+    if (L22_sq < 1e-12)
+        return;
+    double L22 = std::sqrt(L22_sq);
+
+    const QColor ellipseColor(100, 180, 220);
+    const int N_POINTS = 200;
+    QPolygonF poly;
+    poly.reserve(N_POINTS + 1);
+    double minSum = std::numeric_limits<double>::max();
+    double labelPx = 0.0, labelPy = 0.0;
+    for (int i = 0; i <= N_POINTS; ++i) {
+        double t = 2.0 * M_PI * i / N_POINTS;
+        double ct = std::cos(t), st = std::sin(t);
+        double px = toPixX(m_tau.meanMu + m_tau.tau * (L11 * ct));
+        double py = toPixY(m_tau.meanSigma + m_tau.tau * (L21 * ct + L22 * st));
+        poly.append(QPointF(px, py));
+        if (px + py < minSum) {
+            minSum = px + py;
+            labelPx = px;
+            labelPy = py;
+        }
+    }
+    p.setPen(QPen(ellipseColor, PS::LW_ELLIPSE));
+    p.setBrush(Qt::NoBrush);
+    p.drawPolygon(poly);
+
+    // tau label at the upper-left tangent point
+    QFont f = p.font();
+    f.setPointSize(PS::FONT_LABEL);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(ellipseColor.darker(130));
+    p.drawText(QRectF(labelPx - 92, labelPy - 22, 90, 20), Qt::AlignRight | Qt::AlignVCenter,
+               QString("\u03c4_BIC=%1").arg(m_tau.tau, 0, 'f', 2));
+    f.setBold(false);
+    p.setFont(f);
+
+    // Center cross marker
+    double pcx = toPixX(m_tau.meanMu);
+    double pcy = toPixY(m_tau.meanSigma);
+    p.setPen(QPen(Qt::black, PS::LW_CROSS));
+    p.drawLine(QPointF(pcx - 8, pcy), QPointF(pcx + 8, pcy));
+    p.drawLine(QPointF(pcx, pcy - 8), QPointF(pcx, pcy + 8));
 }
 
 void ScatterPlotWidget::drawEllipse3Sigma(QPainter& p) const {

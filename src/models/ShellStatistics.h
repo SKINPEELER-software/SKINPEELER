@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -69,5 +70,62 @@ struct SigmaCuttingResult {
 SigmaCuttingResult cutting3SigmaDistance(const std::vector<std::pair<double, double>>& points,
                                          int offset, double sigmaThreshold,
                                          double distanceJumpSigma);
+
+// -------------------------------------------------------------------------
+// invert2x2OrPinv — invert a 2x2 covariance matrix with numpy semantics:
+// the plain inverse unless the determinant is exactly zero, in which case
+// the Moore-Penrose pseudo-inverse is returned (np.linalg.inv -> pinv
+// fallback used by the experiment harness).
+// -------------------------------------------------------------------------
+void invert2x2OrPinv(const double cov[2][2], double inv[2][2]);
+
+// -------------------------------------------------------------------------
+// gaussianLogLik — log-likelihood of x[0..n) under N(mu, sigma2).
+// sigma2 <= 0 is clamped to 1e-12.
+// -------------------------------------------------------------------------
+double gaussianLogLik(const double* x, int n, double mu, double sigma2);
+
+// -------------------------------------------------------------------------
+// bicChangepoint — BIC changepoint on the squared-distance sequence d2:
+// H0 = single Gaussian (p=2) vs the best two-segment heteroscedastic split
+// (p=4), BIC = -2L + p ln m. Returns k_pos (>=1, 0-based position of the
+// first inner element) or -1 when m < 3 or H0 is not worse than the best
+// split.
+// -------------------------------------------------------------------------
+int bicChangepoint(const std::vector<double>& d2);
+
+// -------------------------------------------------------------------------
+// cutFromThreshold — first element with d <= tau is the first inside shell;
+// returns max(shellIndex(first inside) - 1, 1), or the last shell index if
+// no element is inside. `firstShellIndex` is the shell index of d[0].
+// -------------------------------------------------------------------------
+int cutFromThreshold(const std::vector<double>& d, int firstShellIndex, double tau);
+
+// -------------------------------------------------------------------------
+// MahalBicResult — result of the Mahalanobis + BIC changepoint cut.
+// `computed == false` (fewer than 4 non-air shells) means the caller must
+// fall back itself; the other fields are then not meaningful.
+// The Gaussian is fitted on points[1..] (S2..Sm; S1 is the skin prior and is
+// scored but excluded from the fit).
+// -------------------------------------------------------------------------
+struct MahalBicResult {
+    bool computed = false;
+    std::vector<double>
+        mahalDistances;        // size == points.size(); points[0] scored with the S2..Sm fit
+    std::vector<bool> inside;  // d <= tau; points[0] (S1) forced false (skin prior)
+    bool changepointFound = false;
+    int changepointPos = -1;                                // k_pos within points[1..]
+    double tau = std::numeric_limits<double>::quiet_NaN();  // NaN if no changepoint
+    double meanMu = 0.0, meanSigma = 0.0;                   // fit location
+    double cov[2][2] = {{0, 0}, {0, 0}};                    // fit sample covariance (N-1)
+    int cuttingIndex = 0;                                   // shell index (offset-adjusted)
+};
+
+// -------------------------------------------------------------------------
+// cuttingMahalBic — the SKINPEELER skin-cut rule (classical Mahalanobis +
+// BIC changepoint). `points` = (mu, sigma) of S1..Sm, `offset` = shell index
+// of points[0].
+// -------------------------------------------------------------------------
+MahalBicResult cuttingMahalBic(const std::vector<std::pair<double, double>>& points, int offset);
 
 }  // namespace ShellStatistics

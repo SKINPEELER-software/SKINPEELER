@@ -612,6 +612,18 @@ void MainWindow::continueAnalysis(CTImage* img) {
     if (!stats.empty()) {
         auto* gaussPlot = new GaussianPlotWidget(stats, calcPeelIdx, currThickness);
         auto* scatterPlot = new ScatterPlotWidget(stats, calcPeelIdx, currThickness);
+        if (img->mahalFit().active) {
+            const auto& fit = img->mahalFit();
+            ScatterPlotWidget::TauEllipse e;
+            e.valid = fit.valid;
+            e.meanMu = fit.meanMu;
+            e.meanSigma = fit.meanSigma;
+            for (int r = 0; r < 2; ++r)
+                for (int c = 0; c < 2; ++c)
+                    e.cov[r][c] = fit.cov[r][c];
+            e.tau = fit.tau;
+            scatterPlot->setTauEllipse(e);
+        }
         auto* histPlot = new HistogramWidget(stats);
 
         auto* w1 = new PlotWindow(gaussPlot, "Gaussian Distribution", this);

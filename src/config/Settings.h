@@ -39,12 +39,13 @@ inline constexpr uint32_t IMAGE_MAX_VALUE = 65535;
 // Cutting Shell Detection
 // =============================================================================
 enum class CuttingAlgorithm {
-    THREE_SIGMA,  // 3-sigma ellipse + inter-shell distance (default)
+    THREE_SIGMA,  // 3-sigma ellipse + inter-shell distance
     GMM,          // Gaussian mixture model (not yet implemented)
-    EUCLIDEAN     // Legacy: max Euclidean distance between (mu, sigma) points
+    EUCLIDEAN,    // Legacy: max Euclidean distance between (mu, sigma) points
+    MAHAL_BIC     // Classical Mahalanobis (fit on S2..Sm) + BIC changepoint threshold (default)
 };
 
-inline constexpr CuttingAlgorithm DEFAULT_CUTTING_ALGORITHM = CuttingAlgorithm::THREE_SIGMA;
+inline constexpr CuttingAlgorithm DEFAULT_CUTTING_ALGORITHM = CuttingAlgorithm::MAHAL_BIC;
 inline constexpr bool EXCLUDE_OUTERMOST_SHELL = true;
 inline constexpr double SIGMA_THRESHOLD = 3.0;
 inline constexpr double DISTANCE_JUMP_SIGMA = 2.0;

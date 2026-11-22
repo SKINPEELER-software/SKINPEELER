@@ -6,11 +6,14 @@
 // exports per-shell statistics for every slice.
 //
 // Each row corresponds to one shell of one slice. The skin_cut_index column
-// records the cutting point as determined by the 3-sigma algorithm
-// (CTImage::peelIndex(), which reflects calculateCuttingShell() result).
+// records the cutting point as determined by the engine's default cut rule
+// (CTImage::peelIndex(), which reflects calculateCuttingShell() result;
+// DEFAULT_CUTTING_ALGORITHM in Settings.h). The mahal_d and inside_3sig
+// columns hold that rule's per-shell Mahalanobis distance and inside flag.
 //
-// CSV columns (7):
-//   slice, shell_index, mu, sigma, n_vertices, skin_cut_index, n_shells
+// CSV columns (9):
+//   slice, shell_index, mu, sigma, n_vertices, skin_cut_index, n_shells,
+//   mahal_d, inside_3sig
 //
 // Usage:
 //   exp_shell_export <dicom_dir> <output_csv> [beta=0.60] [max_shells=30]
@@ -188,7 +191,7 @@ int main(int argc, char* argv[])
 
         const auto& shells  = img.shells();
         const int   n_shells   = static_cast<int>(shells.size());
-        const int   cut_index  = img.peelIndex();  // cutting3SigmaDistance result
+        const int   cut_index  = img.peelIndex();  // default cut rule result
 
         if (n_shells == 0) {
             cerr << "  No shells extracted — skipping.\n";

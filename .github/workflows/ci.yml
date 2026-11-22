@@ -10,7 +10,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Full build (GUI + CLI + tests) using the bundled prebuilt V-ImageProcessing
   # static library (third_party/v_imageprocessing/lib/linux-x86_64/libV_2D.a),
-  # followed by the full CTest suite (37 unit/integration tests).
+  # followed by the full CTest suite (48 unit/integration tests).
   # ---------------------------------------------------------------------------
   build-and-test:
     runs-on: ubuntu-latest

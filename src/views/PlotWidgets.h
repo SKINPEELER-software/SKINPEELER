@@ -153,6 +153,21 @@ public:
     explicit ScatterPlotWidget(const ShellStats& stats, int calcPeelIdx, int currThickness,
                                QWidget* parent = nullptr);
 
+    // Mahalanobis + BIC mode: draw the single tau ellipse of the engine's fit
+    // (S2..Sm) instead of the 1/2/3 sigma ellipses. `valid == false` (no
+    // changepoint selected) draws no ellipse.
+    struct TauEllipse {
+        bool valid = false;
+        double meanMu = 0.0, meanSigma = 0.0;
+        double cov[2][2] = {{0, 0}, {0, 0}};
+        double tau = 0.0;
+    };
+    void setTauEllipse(const TauEllipse& e) {
+        m_tauMode = true;
+        m_tau = e;
+        update();
+    }
+
 protected:
     void paintEvent(QPaintEvent*) override;
 
@@ -160,6 +175,10 @@ private:
     void drawScatter(QPainter& p) const;
     bool computeMeanCov(double& meanMu, double& meanSg, double cov[2][2]) const;
     void drawEllipse3Sigma(QPainter& p) const;
+    void drawEllipseTau(QPainter& p) const;
+
+    bool m_tauMode = false;
+    TauEllipse m_tau;
 
     ShellStats m_stats;
     int m_peelIndex;  // algorithm cut

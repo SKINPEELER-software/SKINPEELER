@@ -126,13 +126,28 @@ public:
         return m_algoPeelIndex;
     }
 
-    // Per-shell Mahalanobis distance and inside/outside from cutting3SigmaDistance().
+    // Per-shell Mahalanobis distance and inside/outside from the active cutting
+    // algorithm (cuttingMahalBic() by default, cutting3SigmaDistance() for THREE_SIGMA).
     // Index 0 = shell[0] (excluded from stats, mahal=-1), index 1+ = shell[1]+.
     const std::vector<double>& shellMahalD() const {
         return m_shellMahalD;
     }
     const std::vector<bool>& shellInside() const {
         return m_shellInside;
+    }
+
+    // Mahalanobis + BIC cut: Gaussian fit on S2..Sm (location, sample covariance)
+    // and the selected threshold tau_BIC (NaN when no changepoint was selected or
+    // another algorithm ran). Lets the UI draw the single tau ellipse.
+    struct MahalFit {
+        bool active = false;  // MAHAL_BIC ran with enough shells (fit computed)
+        bool valid = false;   // a changepoint was selected: tau is finite and usable
+        double meanMu = 0.0, meanSigma = 0.0;
+        double cov[2][2] = {{0, 0}, {0, 0}};
+        double tau = 0.0;
+    };
+    const MahalFit& mahalFit() const {
+        return m_mahalFit;
     }
 
     // -------------------------------------------------------------------------
@@ -314,6 +329,7 @@ private:
     int calculateCuttingShell(CuttingAlgorithm algo = DEFAULT_CUTTING_ALGORITHM);
     int cuttingEuclideanDistance();
     int cutting3SigmaDistance();
+    int cuttingMahalBic();
     int cuttingGmmSequential();  // stub → falls back to Euclidean
 
     // -------------------------------------------------------------------------
@@ -348,7 +364,9 @@ private:
 
     // Filled by cutting3SigmaDistance(). Size = m_shells.size().
     std::vector<double> m_shellMahalD;  // shell[0]=-1 (excluded), shell[1+]=actual d
-    std::vector<bool> m_shellInside;    // shell[0]=false, shell[1+]=d<=SIGMA_THRESHOLD
+    std::vector<bool>
+        m_shellInside;    // shell[0]=false, shell[1+]=d<=threshold (S1 false for MAHAL_BIC)
+    MahalFit m_mahalFit;  // filled by cuttingMahalBic()
 
     // Voronoi object — released after shell extraction via releaseVoronoi()
     struct VoronoiImpl;
