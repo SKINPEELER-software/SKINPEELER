@@ -157,7 +157,9 @@ endif()
 # QuasiEdge wrapper traversal otherwise (=0); both give the same shells.
 #
 # Detection: the function name is searched in the prebuilt library (or, for a
-# source build, in the library header).
+# source build, in the library header). The batch program skinpeeler_cli is
+# built only when the primitives are available: evaluating many beta values
+# and slices in one process relies on the allocation-free traversal.
 #
 # -DSKINPEELER_SHELL_FRONT=ON|OFF overrides the detection (AUTO by default).
 set(SKINPEELER_SHELL_FRONT "AUTO" CACHE STRING
@@ -182,7 +184,8 @@ if(SKINPEELER_HAVE_SHELL_FRONT)
     message(STATUS "SKINPEELER: V-ImageProcessing shell-front primitives: available")
 else()
     message(STATUS "SKINPEELER: V-ImageProcessing shell-front primitives: not available "
-                   "-- using the wrapper traversal")
+                   "-- using the wrapper traversal; skinpeeler_cli is not built "
+                   "(see third_party/v_imageprocessing/NOTICE.md)")
 endif()
 add_compile_definitions(SKINPEELER_HAVE_SHELL_FRONT=${SKINPEELER_HAVE_SHELL_FRONT})
 
@@ -338,6 +341,71 @@ target_link_libraries(skinpeeler_core PUBLIC
 target_compile_features(skinpeeler_core PUBLIC cxx_std_17)
 if(WIN32)
     target_compile_definitions(skinpeeler_core PRIVATE _USE_MATH_DEFINES NOMINMAX)
+endif()
+
+# =============================================================================
+# skinpeeler_cli — batch command-line program (no Qt)
+# Built only when the V-ImageProcessing shell-front primitives are available
+# (see above). The git commit is recorded at configure time (re-run cmake
+# after a commit to refresh it); it goes into manifest.json and --version.
+# =============================================================================
+function(skinpeeler_git_state repo_dir out_commit out_dirty)
+    set(_commit "unknown")
+    set(_dirty  "unknown")
+    find_package(Git QUIET)
+    if(GIT_FOUND AND IS_DIRECTORY "${repo_dir}")
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+            WORKING_DIRECTORY "${repo_dir}"
+            OUTPUT_VARIABLE _out OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE _res ERROR_QUIET)
+        if(_res EQUAL 0 AND NOT _out STREQUAL "")
+            set(_commit "${_out}")
+            execute_process(
+                COMMAND "${GIT_EXECUTABLE}" status --porcelain --untracked-files=no
+                WORKING_DIRECTORY "${repo_dir}"
+                OUTPUT_VARIABLE _status OUTPUT_STRIP_TRAILING_WHITESPACE
+                RESULT_VARIABLE _res2 ERROR_QUIET)
+            if(_res2 EQUAL 0)
+                if(_status STREQUAL "")
+                    set(_dirty "false")
+                else()
+                    set(_dirty "true")
+                endif()
+            endif()
+        endif()
+    endif()
+    set(${out_commit} "${_commit}" PARENT_SCOPE)
+    set(${out_dirty}  "${_dirty}"  PARENT_SCOPE)
+endfunction()
+
+if(SKINPEELER_HAVE_SHELL_FRONT)
+    skinpeeler_git_state("${CMAKE_SOURCE_DIR}" SKINPEELER_GIT_COMMIT SKINPEELER_GIT_DIRTY)
+    if(DEFINED V_IP_SOURCE_ROOT)
+        skinpeeler_git_state("${V_IP_SOURCE_ROOT}"
+                             SKINPEELER_V_GIT_COMMIT SKINPEELER_V_GIT_DIRTY)
+    else()
+        # Prebuilt bundle: the library is versioned with this repository.
+        set(SKINPEELER_V_GIT_COMMIT "bundled")
+        set(SKINPEELER_V_GIT_DIRTY  "unknown")
+    endif()
+    message(STATUS "SKINPEELER: engine commit ${SKINPEELER_GIT_COMMIT} "
+                   "(dirty=${SKINPEELER_GIT_DIRTY}), geometry library commit "
+                   "${SKINPEELER_V_GIT_COMMIT} (dirty=${SKINPEELER_V_GIT_DIRTY})")
+
+    add_executable(skinpeeler_cli cli/skinpeeler_cli.cpp)
+    target_include_directories(skinpeeler_cli PRIVATE "${CMAKE_SOURCE_DIR}/cli")
+    target_link_libraries(skinpeeler_cli PRIVATE skinpeeler_core)
+    target_compile_definitions(skinpeeler_cli PRIVATE
+        SKINPEELER_GIT_COMMIT="${SKINPEELER_GIT_COMMIT}"
+        SKINPEELER_GIT_DIRTY="${SKINPEELER_GIT_DIRTY}"
+        SKINPEELER_V_GIT_COMMIT="${SKINPEELER_V_GIT_COMMIT}"
+        SKINPEELER_V_GIT_DIRTY="${SKINPEELER_V_GIT_DIRTY}"
+    )
+    if(WIN32)
+        target_compile_definitions(skinpeeler_cli PRIVATE
+            _USE_MATH_DEFINES NOMINMAX _CRT_SECURE_NO_WARNINGS)
+    endif()
 endif()
 
 # =============================================================================
