@@ -7,7 +7,7 @@
 // Application Info
 // =============================================================================
 inline constexpr const char* APP_NAME = "SKINPEELER";
-inline constexpr const char* APP_VERSION = "2.0";
+inline constexpr const char* APP_VERSION = "2.1";
 inline constexpr const char* APP_ORGANIZATION =
     "Voronoi Diagram Research Center, Hanyang University, Korea";
 

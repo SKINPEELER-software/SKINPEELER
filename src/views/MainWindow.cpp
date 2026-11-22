@@ -855,7 +855,7 @@ void MainWindow::onPeelAllCancelClicked() {
 void MainWindow::onShowManual() {
     QMessageBox::information(
         this, "User Guide",
-        "SKINPEELER 2.0\n\n"
+        "SKINPEELER 2.1\n\n"
         "1. Open DICOM files — load a folder of .dcm slice files.\n"
         "2. Choose Peeling Mode:\n"
         "   Automatic: thickness is detected per-slice automatically.\n"

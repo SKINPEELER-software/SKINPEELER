@@ -26,13 +26,12 @@ interactive use.
 ## Download
 
 Most users just want to run the application — grab a prebuilt package from
-the **[v2.0 release](https://github.com/SKINPEELER-software/SKINPEELER/releases/tag/v2.0)**:
+the **[v2.1 release](https://github.com/SKINPEELER-software/SKINPEELER/releases/tag/v2.1)**:
 a Windows x86_64 zip (extract and run `SKINPEELER.exe`, no installation
 required) or a Linux x86_64 tar.gz (requires the Qt 6 and DCMTK runtime
-libraries).
-
-The v2.0 binaries are built with the 3-sigma cut rule. The default cut rule
-of the source tree is the Mahalanobis distance + BIC changepoint rule (see
+libraries). Both packages contain the GUI (`SKINPEELER`) and the batch
+command-line program (`skinpeeler_cli`), built with the Mahalanobis
+distance + BIC changepoint cut rule (see
 [`docs/algorithm.md`](docs/algorithm.md)).
 
 After downloading, see [`Manual.md`](Manual.md) for how to use the
@@ -220,11 +219,7 @@ sudo apt install qt6-base-dev libdcmtk-dev
 (Qt 5 >= 5.13 is also supported as a fallback if Qt 6 is not found.)
 
 **Windows (MSVC x64):** Qt 6 and DCMTK (e.g. through vcpkg). A prebuilt
-`V_2D.lib` for V-ImageProcessing is bundled. The bundled Windows library
-does not contain the shell-front traversal functions that the batch
-command-line program requires, so on Windows `skinpeeler_cli` and its smoke
-tests are not built; the GUI, the experiment tools, and the unit tests build
-and run. See
+`V_2D.lib` for V-ImageProcessing is bundled; see
 [`third_party/v_imageprocessing/NOTICE.md`](third_party/v_imageprocessing/NOTICE.md).
 
 ### Build
@@ -306,9 +301,9 @@ or fatal error. The beta-selection rules are described in
 [`docs/algorithm.md`](docs/algorithm.md#selecting-beta-for-a-specimen).
 
 `skinpeeler_cli` is built when the linked V-ImageProcessing library provides
-the shell-front traversal functions (the bundled Linux library does; the
-bundled Windows library does not — see
-[`third_party/v_imageprocessing/NOTICE.md`](third_party/v_imageprocessing/NOTICE.md)).
+the shell-front traversal functions; both bundled libraries (Linux and
+Windows) provide them — see
+[`third_party/v_imageprocessing/NOTICE.md`](third_party/v_imageprocessing/NOTICE.md).
 
 ## Tests & CI
 

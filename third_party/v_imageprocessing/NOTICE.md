@@ -35,14 +35,14 @@ Center (VDRC), Hanyang University**.
 | Library | Toolchain | Shell-front functions |
 |---|---|---|
 | `lib/linux-x86_64/libV_2D.a` | GCC 11, Release (`-O3 -DNDEBUG`), position-independent code, C++17 | yes |
-| `lib/win-x64/V_2D.lib` | MSVC x64, Release | no |
+| `lib/win-x64/V_2D.lib` | MSVC x64, Release | yes |
 
-The headers in `include/` describe the Linux library. The *shell-front
+The headers in `include/` describe both libraries. The *shell-front
 functions* are `ImageProcessingBC::select_componentBSFace_by_id`,
 `collect_outer_shell_front`, and `expand_shell_front` (with the types
-`ShellVertex` and `ShellFront`). The Windows library is an earlier build
-that does not export them. The top-level `CMakeLists.txt` detects this by
-searching the library for the function name, and with the Windows library:
+`ShellVertex` and `ShellFront`). The top-level `CMakeLists.txt` checks for
+them by searching the linked library for the function name. When a library
+without these functions is linked (for example an older build):
 
 - the engine uses its `QuasiVertex` / `QuasiEdge` wrapper traversal, which
   produces the same shells;

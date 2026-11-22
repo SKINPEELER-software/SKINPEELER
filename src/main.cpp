@@ -5,7 +5,7 @@
 int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
     app.setApplicationName("SKINPEELER");
-    app.setApplicationVersion("2.0");
+    app.setApplicationVersion("2.1");
     app.setOrganizationName("Voronoi Diagram Research Center, Hanyang University, Korea");
     app.setWindowIcon(QIcon(":/icon.png"));
 

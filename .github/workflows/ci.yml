@@ -59,7 +59,5 @@ jobs:
 # -----------------------------------------------------------------------------
 # TODO (Windows/MSVC job): not added yet. A `windows-latest` job (vcpkg/Qt
 # install + cmake -B build + ctest) would build against the bundled
-# third_party/v_imageprocessing/lib/win-x64/V_2D.lib; with that library
-# skinpeeler_cli and its smoke tests are not built (see
-# third_party/v_imageprocessing/NOTICE.md).
+# third_party/v_imageprocessing/lib/win-x64/V_2D.lib.
 # -----------------------------------------------------------------------------

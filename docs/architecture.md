@@ -83,9 +83,9 @@ CMake detects which one applies by searching the linked library for the
 function name (`-DSKINPEELER_SHELL_FRONT=ON|OFF` overrides the detection).
 `skinpeeler_cli` is built only with the shell-front functions: with the
 wrapper traversal the process memory grows with every evaluated beta and
-slice, which a batch run over a whole series cannot afford. The bundled
-Linux library provides the shell-front functions; the bundled Windows
-library does not (see `third_party/v_imageprocessing/NOTICE.md`).
+slice, which a batch run over a whole series cannot afford. Both bundled
+libraries (Linux and Windows) provide the shell-front functions (see
+`third_party/v_imageprocessing/NOTICE.md`).
 
 ## Concurrency model
 
