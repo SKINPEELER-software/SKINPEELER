@@ -25,11 +25,15 @@ interactive use.
 
 ## Download
 
-Most users just want to run the application — grab the prebuilt Windows
-executable from the **[v1.0 release](https://github.com/SKINPEELER-software/SKINPEELER/releases/tag/v1.0)**
-(no build step required). A v2.0 release with the current source-tree
-feature set (whole-volume "Peel All" with a progress bar and cancel
-support, etc.) is planned.
+Most users just want to run the application — grab a prebuilt package from
+the **[v2.0 release](https://github.com/SKINPEELER-software/SKINPEELER/releases/tag/v2.0)**:
+a Windows x86_64 zip (extract and run `SKINPEELER.exe`, no installation
+required) or a Linux x86_64 tar.gz (requires the Qt 6 and DCMTK runtime
+libraries).
+
+The v2.0 binaries are built with the 3-sigma cut rule. The default cut rule
+of the source tree is the Mahalanobis distance + BIC changepoint rule (see
+[`docs/algorithm.md`](docs/algorithm.md)).
 
 After downloading, see [`Manual.md`](Manual.md) for how to use the
 application.
@@ -63,15 +67,16 @@ can serve as a label generator for deep segmentation models.
 
 - Load a directory of DICOM slices (including JPEG Lossless–compressed
   series) with Hounsfield-Unit windowing applied on load
-- Per-slice Voronoi diagram / beta-complex shell computation, with an
-  adjustable beta ("detection probe") parameter
+- Per-slice quasi-triangulation / beta-complex shell computation, with an
+  adjustable beta ("detection probe") parameter shared by all slices of
+  the loaded series
 - Shell overlay visualization on top of the CT slice
 - Single-slice or whole-volume ("Peel All") skin removal, with a progress
   bar and cancel support for the batch operation
 - Selectable peel region: whole body or a half-body quadrant
 - Statistical plots per slice: pixel-intensity Gaussian fit, shell
-  (mu, sigma) scatter with a 3-sigma ellipse, and an inter-shell distance
-  histogram
+  (mu, sigma) scatter with the Mahalanobis threshold ellipse of the cut
+  rule, and an inter-shell distance histogram
 - Manual annotation mode (paint / clear / export a ground-truth skin mask)
   for comparing the algorithm's cut against a hand-drawn reference
 - Export of the peeled DICOM series and a per-slice statistics report
@@ -93,20 +98,21 @@ Scientific Reports 15, 19659 (2025), CC BY 4.0.*
 
 SKINPEELER segments the high-density boundary of a slice in five stages:
 **P2D transformation** maps each pixel's Hounsfield Unit value to a disk
-radius; a **Voronoi diagram of the resulting disks** is constructed over
-the slice; a **quasi-triangulation / beta-complex** is extracted from the
-Voronoi diagram at a chosen beta value; **iterative shell peeling** walks
+radius; the **quasi-triangulation of the resulting disks** (the dual of
+their Voronoi diagram) is constructed directly on the pixel grid; a
+**beta-complex** is extracted from the quasi-triangulation at the
+specimen's beta value; **iterative shell peeling** walks
 inward from the outer boundary of the beta-complex, extracting concentric
-shells; and **statistical classification** (Mahalanobis distance against a
-BIC-based decision) determines how many of the outermost shells form the
-high-density boundary layer. See [`docs/algorithm.md`](docs/algorithm.md)
+shells; and **statistical classification** (Mahalanobis distance with a
+BIC changepoint threshold) determines how many of the outermost shells form
+the high-density boundary layer. See [`docs/algorithm.md`](docs/algorithm.md)
 for the per-stage input/output and parameter details.
 
 ```mermaid
 flowchart LR
     A["CT slice<br/>(Hounsfield Units)"] --> B["P2D transformation<br/>HU -> disk radius"]
-    B --> C["Voronoi diagram<br/>of disks"]
-    C --> D["Quasi-triangulation /<br/>beta-complex extraction"]
+    B --> C["Quasi-triangulation<br/>of disks"]
+    C --> D["Beta-complex<br/>extraction"]
     D --> E["Iterative shell peeling"]
     E --> F["Statistical classification<br/>Mahalanobis distance + BIC cut"]
     F --> G["Segmented boundary<br/>(shell cut index)"]
@@ -208,7 +214,7 @@ output for it, as a worked example:
 ctest --test-dir build --output-on-failure
 ```
 
-37 GoogleTest unit/integration tests cover the pure-math cutting-statistics
+48 GoogleTest unit/integration tests cover the pure-math cutting-statistics
 module (`ShellStatistics`), `CTShell` statistics, `BedDetector`'s public
 static helpers, `PeelingService`'s section/interpolation math,
 `StatisticsService`'s inter-shell distance computation, and one end-to-end

@@ -58,7 +58,7 @@ Encoder–decoder U-Net written from scratch in PyTorch (`src/models.py`).
 
 | Item | Value |
 | --- | --- |
-| Labels | SKINPEELER skin masks, 2,905 slices from 5 specimens; β chosen per specimen from the whole volume without annotation |
+| Labels | SKINPEELER skin masks, 2,905 slices from 5 specimens; Mahalanobis + BIC cut rule; β chosen per specimen from the whole volume without annotation |
 | Split | leave-one-specimen-out; of the four training specimens one is held out for validation |
 | Model selection | checkpoint with the best Dice against the validation specimen's pseudo-labels |
 | Loss | binary cross-entropy + soft Dice |

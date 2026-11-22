@@ -22,8 +22,8 @@ quantitative performance.
 ```mermaid
 flowchart LR
     A["CT slice<br/>(Hounsfield Units)"] --> B["1. P2D transformation<br/>HU -> disk radius"]
-    B --> C["2. Voronoi diagram<br/>of disks"]
-    C --> D["3. Quasi-triangulation /<br/>beta-complex extraction"]
+    B --> C["2. Quasi-triangulation<br/>of disks"]
+    C --> D["3. Beta-complex<br/>extraction"]
     D --> E["4. Iterative shell peeling"]
     E --> F["5. Statistical classification<br/>Mahalanobis distance + BIC cut"]
     F --> G["Segmented boundary<br/>(shell cut index)"]
@@ -38,26 +38,28 @@ rescale slope/intercept and VOI LUT windowing.
 **Output:** one disk per pixel, each disk centered at the pixel's image
 coordinate with a radius derived from that pixel's HU value — denser
 tissue (higher HU) maps to a larger disk. This is the "P2D" (pixel-to-disk)
-step that turns a raster image into the point/weight input the Voronoi
-construction expects.
+step that turns a raster image into the point/weight input the
+quasi-triangulation construction expects.
 
-## 2. Voronoi diagram of disks
+## 2. Quasi-triangulation of disks
 
 **Input:** the full set of weighted disks from stage 1.
 
-**Output:** the additively-weighted Voronoi diagram of those disks,
-constructed by V-ImageProcessing (`ImageProcessingBC::constructForImageProcessing16bit`
-in this codebase). Each Voronoi cell corresponds to one disk's region of
-influence; neighboring cells that correspond to touching/overlapping disks
-indicate adjacent tissue.
+**Output:** the quasi-triangulation of those disks — the dual structure of
+their additively-weighted Voronoi diagram — built by V-ImageProcessing
+(`ImageProcessingBC::constructForImageProcessing16bit` in this codebase).
+Because the disk centers lie on the regular pixel grid, the
+quasi-triangulation is constructed directly on that grid; the Voronoi
+diagram itself is not computed. Each quasi-triangulation vertex corresponds
+to one disk, and an edge joins two disks whose Voronoi cells are adjacent.
 
-## 3. Quasi-triangulation / beta-complex extraction
+## 3. Beta-complex extraction
 
-**Input:** the Voronoi diagram from stage 2 and a scalar **beta**
+**Input:** the quasi-triangulation from stage 2 and a scalar **beta**
 parameter.
 
-**Output:** the beta-complex (a subset of the quasi-triangulation dual to
-the Voronoi diagram) at that beta value, and its connected components. The
+**Output:** the beta-complex (a subset of the quasi-triangulation) at that
+beta value, and its connected components. The
 implementation classifies components by score (`area * circularity^2`) and
 selects the highest-scoring component as the body ("body0") — the
 component that best represents the specimen's connected tissue mass as
@@ -65,11 +67,12 @@ opposed to background, imaging artifacts, or (if present) the scan bed.
 `BedDetector` runs on these components to identify and exclude CT-bed
 components from that selection when bed removal is enabled.
 
-Beta controls how permissive the complex is in connecting nearby disks: in
-this codebase, a specimen- and dataset-dependent beta is set per slice (see
-`DEFAULT_BETA` in `src/config/Settings.h`) and can be adjusted interactively
-in the GUI (the "detection probe" control). See the papers above for how
-beta is chosen/validated for a given specimen.
+Beta controls how permissive the complex is in connecting nearby disks.
+Beta is a specimen-level parameter: one value is used for every slice of a
+specimen's CT series. `DEFAULT_BETA` in `src/config/Settings.h` is the
+starting value, and the GUI's "detection probe" control changes it for the
+loaded series. See the papers above for how beta is chosen/validated for a
+given specimen.
 
 ## 4. Iterative shell peeling
 
@@ -78,7 +81,7 @@ beta is chosen/validated for a given specimen.
 **Output:** a sequence of concentric **shells**, numbered outward-in
 starting from 0 (the outermost boundary). Each shell is extracted by
 repeatedly peeling the outer boundary of the remaining structure and
-recording the removed layer's Voronoi vertices (position + disk radius).
+recording the removed layer's vertices (disk position + radius).
 Each shell's set of disk radii (equivalently, diameters) is summarized by
 its mean and standard deviation (`CTShell::calculateStatistics()`,
 population standard deviation). This produces a per-shell `(mu, sigma)`
@@ -89,25 +92,52 @@ inward from the surface.
 
 **Input:** the per-shell `(mu, sigma)` sequence from stage 4.
 
-**Output:** a single integer **cut index**: the number of outermost shells
-classified as the high-density boundary layer (e.g. the dermal denticle /
-skin layer), as opposed to interior tissue. Shells at index `0 .. cut-1` are
-the boundary layer; the rest are interior.
+**Output:** a single integer **cut index** `c`. Shells `0 .. c` form the
+high-density boundary layer (e.g. the dermal denticle / skin layer) and are
+removed by peeling; shells `c+1 ..` are interior tissue. Shell 0, the
+outermost layer in contact with air, is excluded from the statistics, and
+shell 1 is always part of the boundary layer, so `c >= 1`.
 
-The default classifier (`ShellStatistics::cutting3SigmaDistance`,
-`CuttingAlgorithm::THREE_SIGMA` in `src/config/Settings.h`) fits a 2D
-Gaussian over the `(mu, sigma)` points, computes each shell's Mahalanobis
-distance to that fit, and walks inward from the outermost shell: shells
-within a sigma-threshold ellipse (`SIGMA_THRESHOLD` = 3.0 by default) are
-classified as interior, and the cut is placed at the first such shell
-(minus one). If fewer than four shells are available or the fitted
-covariance is singular, the implementation falls back to a Euclidean
-distance-jump heuristic (`ShellStatistics::cuttingEuclideanDistance`): the
-largest consecutive jump in `(mu, sigma)` space. A distribution-free
-jump-detection fallback (`findDistanceJump`, threshold
-`DISTANCE_JUMP_SIGMA` = 2.0 by default) is also available. A Gaussian
-Mixture Model variant (`CuttingAlgorithm::GMM`) is declared but not yet
-implemented and currently falls back to the Euclidean heuristic.
+The default classifier (`ShellStatistics::cuttingMahalBic`,
+`CuttingAlgorithm::MAHAL_BIC` in `src/config/Settings.h`) is a Mahalanobis
+distance + Bayesian information criterion (BIC) changepoint rule over the
+shells `S1 .. Sm` (shell 1 to the innermost shell):
+
+1. **Gaussian fit.** A 2D Gaussian (mean and sample covariance) is fitted
+   to the `(mu, sigma)` points of `S2 .. Sm`. `S1` is excluded from the fit.
+2. **Mahalanobis distance.** Each shell's Mahalanobis distance `d` to that
+   fit is computed. Boundary-layer shells lie far from the interior-tissue
+   cluster and have large `d`.
+3. **BIC changepoint.** On the outside-in sequence of squared distances
+   `d^2` of `S2 .. Sm`, a single-Gaussian model (2 parameters) is compared
+   with the best two-segment model with separate mean and variance per
+   segment (4 parameters), using `BIC = -2 ln L + p ln m`. A changepoint is
+   selected when the two-segment model has the lower BIC.
+4. **Threshold and cut.** The threshold `tau` is the square root of the
+   mean of the two `d^2` values on either side of the changepoint. The
+   first shell from `S2` inward with `d <= tau` is the first interior shell,
+   and the cut index is the index of the shell before it.
+
+The rule has no tuned threshold: `tau` is derived from each slice's own
+shell sequence. If BIC selects no changepoint, every shell is classified as
+boundary layer (the cut index is the last shell). If fewer than four shells
+carry statistics, the cut falls back to a Euclidean distance-jump heuristic
+(`ShellStatistics::cuttingEuclideanDistance`): the largest consecutive jump
+in `(mu, sigma)` space.
+
+The rule is selected at compile time by `DEFAULT_CUTTING_ALGORITHM` in
+`src/config/Settings.h`. The alternatives are:
+
+- `CuttingAlgorithm::THREE_SIGMA` (`ShellStatistics::cutting3SigmaDistance`)
+  — fits the Gaussian over all of `S1 .. Sm` and classifies shells inside a
+  fixed Mahalanobis ellipse (`SIGMA_THRESHOLD` = 3.0) as interior; when
+  `S1` is already inside the ellipse or no shell is, the cut comes from a
+  distribution-free jump detection (`findDistanceJump`, threshold
+  `DISTANCE_JUMP_SIGMA` = 2.0).
+- `CuttingAlgorithm::EUCLIDEAN` — the Euclidean distance-jump heuristic
+  alone.
+- `CuttingAlgorithm::GMM` — declared but not implemented; it runs the
+  Euclidean heuristic.
 
 This is a pure-math module (`src/models/ShellStatistics.*`) with no
 dependency on `CTImage`, V-ImageProcessing, or DCMTK, so the cut-decision
@@ -118,10 +148,11 @@ logic is unit-tested directly against synthetic `(mu, sigma)` inputs (see
 
 | Parameter | Meaning | Default (`src/config/Settings.h`) |
 |---|---|---|
-| `beta` | Beta-complex construction parameter (stage 3); controls how permissively nearby disks are connected into the body component. | `DEFAULT_BETA = 0.7` |
-| cut index | Number of outermost shells (stage 5) classified as the high-density boundary layer. | computed per slice, not a fixed constant |
-| `SIGMA_THRESHOLD` | Mahalanobis-distance ellipse threshold (in sigma) used by the default 3-sigma classifier to decide "inside" vs. boundary. | `3.0` |
-| `DISTANCE_JUMP_SIGMA` | Threshold (in sigma of inter-shell distances) for the distribution-free jump-detection fallback. | `2.0` |
+| `beta` | Beta-complex construction parameter (stage 3); controls how permissively nearby disks are connected into the body component. One value per specimen (CT series). | `DEFAULT_BETA = 0.7` |
+| cut index | Index of the innermost shell (stage 5) classified as the high-density boundary layer. | computed per slice, not a fixed constant |
+| `DEFAULT_CUTTING_ALGORITHM` | Cut rule used in stage 5. | `CuttingAlgorithm::MAHAL_BIC` |
+| `SIGMA_THRESHOLD` | Mahalanobis-distance ellipse threshold (in sigma). Used only by the `THREE_SIGMA` rule. | `3.0` |
+| `DISTANCE_JUMP_SIGMA` | Threshold (in sigma of inter-shell distances) for jump detection. Used only by the `THREE_SIGMA` rule. | `2.0` |
 
 See the papers listed above for how these parameters were chosen and
 validated against ground truth on real specimen CT data.

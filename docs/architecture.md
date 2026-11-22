@@ -30,7 +30,7 @@ flowchart TB
    `third_party/v_imageprocessing/NOTICE.md`.
 2. **SKINPEELER engine** (`src/models/`, `src/services/`) — the algorithm
    implementation described in [`algorithm.md`](algorithm.md): DICOM I/O,
-   Voronoi/beta-complex orchestration, shell extraction, cutting-point
+   quasi-triangulation/beta-complex orchestration, shell extraction, cutting-point
    statistics, and peeling. Has **no Qt dependency**, so it can be driven
    from a GUI, a CLI tool (see `cli/`), a test binary (see `tests/`), or any
    other front end without change.
@@ -42,17 +42,17 @@ flowchart TB
 
 | Layer | Class | Role |
 |---|---|---|
-| Engine (model) | `CTImage` | Owns the state of one CT slice: DICOM metadata and pixel data (via DCMTK), Voronoi/beta-complex construction (via `ImageProcessingBC`), shell extraction, cutting-point detection, bed-removal orchestration, and skin peeling / re-serialization for export. |
-| Engine (model) | `CTShell` | A single extracted shell: its list of Voronoi vertices (position + disk radius) and the shell's (mu, sigma) intensity statistics. |
+| Engine (model) | `CTImage` | Owns the state of one CT slice: DICOM metadata and pixel data (via DCMTK), quasi-triangulation/beta-complex construction (via `ImageProcessingBC`), shell extraction, cutting-point detection, bed-removal orchestration, and skin peeling / re-serialization for export. |
+| Engine (model) | `CTShell` | A single extracted shell: its list of quasi-triangulation vertices (disk position + radius) and the shell's (mu, sigma) intensity statistics. |
 | Engine (model) | `BedDetector` | Detects CT-bed components among beta-complex components in a slice, using position/circularity/width/curvature/convexity checks. Its scoring helpers (`fitPolynomial`, `maxCurvature`, `checkSagAndChord`) are public static pure functions, designed for unit-testability without a `CTImage` or DICOM file. |
 | Engine (model) | `BedCache` | Disk-backed cache of per-slice `BedDetector::Result`, keyed by specimen directory, so bed detection does not need to be recomputed across sessions. |
-| Engine (model) | `ShellStatistics` | Stateless free functions operating on plain `(mu, sigma)` values: 2x2 covariance inversion, Mahalanobis distance, Euclidean-jump detection, and the 3-sigma-ellipse cutting-point computation. This is the mathematical core of the cut decision, deliberately decoupled from `CTImage`, V-ImageProcessing, and DCMTK so it can be unit-tested with synthetic inputs. |
+| Engine (model) | `ShellStatistics` | Stateless free functions operating on plain `(mu, sigma)` values: 2x2 covariance inversion, Mahalanobis distance, the BIC changepoint search, the Mahalanobis + BIC cutting-point computation (the default cut rule), and the 3-sigma-ellipse and Euclidean-jump alternatives. This is the mathematical core of the cut decision, deliberately decoupled from `CTImage`, V-ImageProcessing, and DCMTK so it can be unit-tested with synthetic inputs. |
 | Engine (service) | `DicomService` | Finds and sorts `.dcm` files in a directory, batch-loads them into `CTImage` objects, normalizes intensity across slices to a common maximum, and batch-saves peeled output. |
 | Engine (service) | `PeelingService` | Batch peeling across a loaded volume: auto mode (each slice computes its own cut) and uniform mode (user-set cuts at key sections, linearly interpolated between them). Takes progress/cancel callbacks instead of touching Qt directly. |
 | Engine (service) | `StatisticsService` | Collects per-slice `CTImage::Stats` into a `StatsList`, formats text reports, and computes inter-shell Euclidean distance summaries. |
 | UI (view) | `MainWindow` | The Qt main window: wires UI signals (open/save, navigate, adjust beta, peel, annotate) to engine calls, owns the background-task runner (`runEngineTask`, see below) and the progress bar / cancel button for batch peeling. |
 | UI (view) | `SkinPeelerScene` | `QGraphicsScene`-based rendering of the current CT slice and its shell overlay, plus manual annotation painting. |
-| UI (view) | `PlotWidgets` / `PlotWindow` | `QPainter`-based statistical plot panels (Gaussian intensity fit, shell `(mu, sigma)` scatter with a 3-sigma ellipse, inter-shell distance histogram) shown in a separate plot window. |
+| UI (view) | `PlotWidgets` / `PlotWindow` | `QPainter`-based statistical plot panels (Gaussian intensity fit, shell `(mu, sigma)` scatter with the Mahalanobis threshold ellipse of the active cut rule, inter-shell distance histogram) shown in a separate plot window. |
 
 ## Concurrency model
 
